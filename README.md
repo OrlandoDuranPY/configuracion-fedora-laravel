@@ -14,7 +14,7 @@ A lo largo de esta guía configuraremos los componentes necesarios para trabajar
 
 El objetivo final es contar con un entorno de desarrollo estable, reproducible y fácil de mantener para proyectos basados en PHP/Laravel.
 
-## 1. Instalación de Apache (httpd)
+## 1. Instalar Apache (httpd)
 
 En este primer paso instalaremos y habilitaremos el servidor web **Apache (httpd)**, que utilizaremos como base para ejecutar nuestras aplicaciones PHP/Laravel.
 
@@ -94,3 +94,37 @@ sudo chown -R orlandoduranpy /var/www/html
 ```
 
 Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
+
+## 3. Instalación de MySQL
+
+En este paso se instalará y habilitará el servidor de base de datos MySQL, que será utilizado por las aplicaciones desarrolladas con PHP y Laravel.
+
+### 3.1 Instalar el servidor MySQL
+
+Para instalar el servidor MySQL en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install mysql-server
+```
+
+Este comando descargará e instalará el paquete `mysql-server` junto con sus dependencias.
+
+### 3.2 Iniciar y habilitar el servicio MySQL
+
+Una vez instalado, se debe iniciar el servicio de MySQL:
+
+```bash
+sudo systemctl start mysqld
+```
+
+Para que el servicio se inicie automáticamente cada vez que arranque el sistema, se habilita con:
+
+```bash
+sudo systemctl enable mysqld
+```
+
+Opcionalmente, se puede comprobar el estado del servicio con:
+
+```bash
+systemctl status mysqld
+```
