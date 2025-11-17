@@ -219,7 +219,7 @@ All done!
 
 Con esto, la instalación de **MySQL** queda asegurada con una contraseña para `root` y con una configuración básica de seguridad adecuada para continuar con el entorno de desarrollo.
 
-## 3.4 Verificar acceso a MySQL
+### 3.4 Verificar acceso a MySQL
 
 Como último paso, es recomendable validar que el acceso al servidor MySQL funciona correctamente con el usuario `root` y la contraseña configurada en el asistente anterior.
 
@@ -262,8 +262,120 @@ La salida típica incluirá al menos las siguientes bases de datos del sistema:
 
 - `mysql`
 
-- `performance_schema`
+- `performance_schema
 
 - `sys`
 
 Si se puede iniciar sesión correctamente y se muestran estas bases de datos sin errores, se puede considerar que la instalación y configuración básica de MySQL se ha realizado con éxito y que el servidor está listo para utilizarse en el entorno de desarrollo.
+
+## 4. Instalación de PHP y Composer
+
+En este paso se instalará PHP junto con un conjunto de extensiones comunes necesarias para trabajar con Laravel y aplicaciones web en general. Posteriormente se verá la instalación de Composer.
+
+### 4.1 Instalación de PHP y extensiones comunes
+
+Para instalar PHP y algunas extensiones recomendadas para Laravel, se puede utilizar el siguiente comando:
+
+```bash
+sudo dnf install php php-mysqlnd php-pdo php-gd php-mbstring php-xml php-cli php-common php-json php-opcache php-pgsql php-pdo_pgsql -y
+```
+
+Este comando instala:
+
+- `php`
+  Paquete principal de PHP (intérprete del lenguaje).
+
+- `php-mysqlnd`
+  Controlador nativo de MySQL para PHP. Permite que PHP se conecte a bases de datos MySQL/MariaDB.
+
+- `php-pdo`
+  Proporciona la capa PDO (PHP Data Objects), utilizada por Laravel para conectarse a bases de datos de forma abstracta.
+
+- `php-gd`
+  Librería para manipulación de imágenes (redimensionar, recortar, generar imágenes, etc.).
+
+- `php-mbstring`
+  Extensión para manejar cadenas multibyte (UTF-8, acentos, caracteres especiales). Es requerida por Laravel y muchas librerías.
+
+- `php-xml`
+  Permite trabajar con XML, necesario para ciertas extensiones y herramientas del ecosistema PHP.
+
+- `php-cli`
+  Versión de PHP para línea de comandos. Es esencial para ejecutar Artisan, Composer y otros scripts.
+
+- `php-common`
+  Archivos comunes compartidos por distintos módulos de PHP.
+
+- `php-json`
+  Soporte para JSON, ampliamente utilizado en APIs y respuestas de Laravel.
+
+- `php-opcache`
+  Módulo de caché de opcode que mejora el rendimiento de PHP al almacenar en caché el código ya compilado.
+
+- `php-pgsql`
+  Extensión que permite a PHP conectarse directamente a bases de datos PostgreSQL.
+
+- `php-pdo_pgsql`
+  Controlador PDO específico para PostgreSQL. Laravel lo utiliza cuando la conexión se configura con el driver pgsql.
+
+El parámetro `-y` acepta automáticamente las confirmaciones de instalación.
+
+Después de la instalación, se puede verificar la versión de PHP instalada con:
+
+```bash
+php -v
+```
+
+Esto confirma que PHP está disponible en la línea de comandos y listo para utilizarse en el entorno de desarrollo.
+
+### 4.2 Instalación de Composer
+
+**Composer** es el gestor de dependencias más utilizado en el ecosistema PHP y es una herramienta fundamental para trabajar con `Laravel`, ya que permite instalar el framework y las librerías necesarias para cada proyecto.
+
+En Fedora, Composer se puede instalar directamente desde los repositorios oficiales con el siguiente comando:
+
+```bash
+sudo dnf install composer -y
+```
+
+Este comando:
+
+- Descarga e instala el paquete `composer`.
+
+- Deja disponible el comando `composer` en la línea de comandos del sistema.
+
+- Utiliza la opción `-y` para aceptar automáticamente las confirmaciones de instalación.
+
+Una vez finalizada la instalación, se puede verificar que Composer esté correctamente instalado y disponible ejecutando:
+
+Una vez finalizada la instalación, se puede verificar que Composer esté correctamente instalado y disponible ejecutando:
+
+```bash
+composer -V
+```
+
+La salida mostrará la versión instalada de Composer, lo que confirma que la herramienta está lista para ser utilizada en la gestión de dependencias de proyectos PHP y Laravel.
+
+### 4.3 Reiniciar Apache para aplicar los cambios
+
+Después de instalar PHP y sus extensiones, así como Composer, es recomendable reiniciar el servicio de Apache para asegurarse de que cargue correctamente los módulos de PHP recién instalados.
+
+Para reiniciar Apache se utiliza el siguiente comando:
+
+```bash
+sudo systemctl restart httpd.service
+```
+
+Este comando:
+
+- Detiene y vuelve a iniciar el servicio `httpd`.
+
+- Hace que Apache cargue la configuración y módulos actualizados, incluyendo el soporte para PHP.
+
+Opcionalmente, se puede verificar que Apache siga en ejecución con:
+
+```bash
+systemctl status httpd.service
+```
+
+Si el servicio aparece como `active (running)` y no se muestran errores, Apache está funcionando correctamente con soporte para PHP y se puede continuar con la configuración del entorno Laravel.
