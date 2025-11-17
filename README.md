@@ -128,3 +128,142 @@ Opcionalmente, se puede comprobar el estado del servicio con:
 ```bash
 systemctl status mysqld
 ```
+
+### 3.3 Configuración inicial con `mysql_secure_installation`
+
+Después de la instalación, es recomendable ejecutar el asistente de configuración de seguridad de MySQL para definir la contraseña del usuario administrador (`root`) y aplicar algunas medidas básicas de seguridad.
+
+Para iniciar el asistente, se utiliza el siguiente comando:
+
+```bash
+sudo mysql_secure_installation
+```
+
+Al ejecutar este comando, MySQL mostrará algo similar a lo siguiente:
+
+```bash
+Securing the MySQL server deployment.
+
+Connecting to MySQL using a blank password.
+
+VALIDATE PASSWORD COMPONENT can be used to test passwords
+and improve security. It checks the strength of password
+and allows the users to set only those passwords which are
+secure enough. Would you like to setup VALIDATE PASSWORD component?
+
+Press y|Y for Yes, any other key for No:
+```
+
+En este punto, el asistente solicita la contraseña actual del usuario `root` y confirma que el componente `validate_password` está instalado y configurado.
+
+A continuación, se preguntará si se desea cambiar la contraseña de `root`:
+
+```bash
+Change the password for root ? ((Press y|Y for Yes, any other key for No) :
+```
+
+Si se responde `y` o `Y`, el asistente permitirá establecer una nueva contraseña. Durante este proceso MySQL mostrará un estimado de la fortaleza de la contraseña:
+
+```bash
+New password:
+
+Re-enter new password:
+
+Estimated strength of the password: 100
+Do you wish to continue with the password provided?(Press y|Y for Yes, any other key for No) :
+```
+
+Si la contraseña no cumple con la política definida por `validate_password`, MySQL mostrará un mensaje de error indicando que no satisface los requisitos de la política, y solicitará ingresar una nueva contraseña hasta que sea aceptada.
+
+Una vez configurada la contraseña, el asistente continúa con otras preguntas de seguridad:
+
+- **Eliminar usuarios anónimos:**
+
+```bash
+Remove anonymous users? (Press y|Y for Yes, any other key for No) :
+```
+
+En entornos de desarrollo se puede responder `y` para mantener un entorno más limpio.
+
+- **Restringir el acceso remoto de `root`:**
+
+```bash
+Disallow root login remotely? (Press y|Y for Yes, any other key for No) :
+```
+
+En entornos de producción se recomienda responder `y`. En desarrollo, se puede dejar el acceso remoto deshabilitado o habilitado según la necesidad.
+
+- **Eliminar la base de datos de pruebas (`test`):**
+
+```bash
+Remove test database and access to it? (Press y|Y for Yes, any other key for No) :
+```
+
+En producción se recomienda eliminarla; en desarrollo es opcional.
+
+- **Recargar las tablas de privilegios:**
+
+```bash
+Reload privilege tables now? (Press y|Y for Yes, any other key for No) :
+```
+
+Lo habitual es responder `y` para aplicar inmediatamente todos los cambios.
+
+Al finalizar, el asistente mostrará un mensaje similar a:
+
+```bash
+Success.
+
+All done!
+```
+
+Con esto, la instalación de **MySQL** queda asegurada con una contraseña para `root` y con una configuración básica de seguridad adecuada para continuar con el entorno de desarrollo.
+
+## 3.4 Verificar acceso a MySQL
+
+Como último paso, es recomendable validar que el acceso al servidor MySQL funciona correctamente con el usuario `root` y la contraseña configurada en el asistente anterior.
+
+Para conectarse a MySQL se utiliza:
+
+```bash
+sudo mysql -u root -p
+```
+
+Donde:
+
+- `sudo` ejecuta el comando con privilegios de superusuario.
+
+- `-u` root indica que se usará el usuario root de MySQL.
+
+- `-p` indica que se solicitará la contraseña al iniciar sesión.
+
+Al ejecutar el comando, el sistema pedirá la contraseña:
+
+```bash
+Enter password:
+```
+
+Tras introducir la contraseña correcta, se mostrará el monitor de MySQL (prompt interactivo), identificado por algo similar a:
+
+```
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+mysql>
+```
+
+Dentro del monitor de MySQL, se puede listar las bases de datos disponibles con:
+
+```bash
+SHOW DATABASES;
+```
+
+La salida típica incluirá al menos las siguientes bases de datos del sistema:
+
+- `information_schema`
+
+- `mysql`
+
+- `performance_schema`
+
+- `sys`
+
+Si se puede iniciar sesión correctamente y se muestran estas bases de datos sin errores, se puede considerar que la instalación y configuración básica de MySQL se ha realizado con éxito y que el servidor está listo para utilizarse en el entorno de desarrollo.
