@@ -1,6 +1,6 @@
-# Configuración de Fedora Workstation 43 para PHP y Laravel
+# Configuración de Fedora Workstation para PHP y Laravel
 
-Este repositorio tiene como objetivo documentar la configuración de un entorno de desarrollo en **Fedora Workstation 43** orientado a **PHP** y **Laravel**.
+Este repositorio tiene como objetivo documentar la configuración de un entorno de desarrollo en **Fedora Workstation** orientado a **PHP** y **Laravel**.
 
 A lo largo de esta guía configuraremos los componentes necesarios para trabajar de forma cómoda y ordenada con estas tecnologías, cubriendo, entre otros, los siguientes temas:
 
@@ -50,7 +50,7 @@ Para que Apache se inicie automáticamente cada vez que arranque el sistema, eje
 sudo systemctl enable httpd.service
 ```
 
-Con esto, el servicio httpd quedará instalado, iniciado y configurado para arrancar automáticamente con Fedora Workstation 43.
+Con esto, el servicio httpd quedará instalado, iniciado y configurado para arrancar automáticamente con Fedora Workstation.
 
 ## 2. Asignar permisos a `/var/www/html/`
 
