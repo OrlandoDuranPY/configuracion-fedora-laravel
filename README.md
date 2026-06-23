@@ -6,9 +6,10 @@ A lo largo de esta guía configuraremos los componentes necesarios para trabajar
 
 - Instalación y configuración de **Apache**.
 - Asignación de permisos a la carpeta `/var/www/html/`.
+- Instalación de **PHP** y **Composer**.
+- Instalación de **Node.js** y **npm**.
 - Instalación y configuración de **MySQL**.
 - Instalación y configuración de **PostgreSQL**.
-- Instalación de **PHP** y **Composer**.
 - Instalación y configuración de **phpMyAdmin**.
 - Ajustes adicionales útiles para el desarrollo con Laravel.
 
@@ -95,11 +96,159 @@ sudo chown -R orlandoduranpy /var/www/html
 
 Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
 
-## 3. Instalación de MySQL
+## 3. Instalación de PHP y Composer
+
+En este paso se instalará PHP junto con un conjunto de extensiones comunes necesarias para trabajar con Laravel y aplicaciones web en general. Posteriormente se verá la instalación de Composer.
+
+### 3.1 Instalación de PHP y extensiones comunes
+
+Para instalar PHP y algunas extensiones recomendadas para Laravel, se puede utilizar el siguiente comando:
+
+```bash
+sudo dnf install php php-mysqlnd php-pdo php-gd php-mbstring php-xml php-cli php-common php-json php-opcache php-pgsql php-pdo_pgsql php-bcmath -y
+```
+
+Este comando instala:
+
+- `php`
+  Paquete principal de PHP (intérprete del lenguaje).
+
+- `php-mysqlnd`
+  Controlador nativo de MySQL para PHP. Permite que PHP se conecte a bases de datos MySQL/MariaDB.
+
+- `php-pdo`
+  Proporciona la capa PDO (PHP Data Objects), utilizada por Laravel para conectarse a bases de datos de forma abstracta.
+
+- `php-gd`
+  Librería para manipulación de imágenes (redimensionar, recortar, generar imágenes, etc.).
+
+- `php-mbstring`
+  Extensión para manejar cadenas multibyte (UTF-8, acentos, caracteres especiales). Es requerida por Laravel y muchas librerías.
+
+- `php-xml`
+  Permite trabajar con XML, necesario para ciertas extensiones y herramientas del ecosistema PHP.
+
+- `php-cli`
+  Versión de PHP para línea de comandos. Es esencial para ejecutar Artisan, Composer y otros scripts.
+
+- `php-common`
+  Archivos comunes compartidos por distintos módulos de PHP.
+
+- `php-json`
+  Soporte para JSON, ampliamente utilizado en APIs y respuestas de Laravel.
+
+- `php-opcache`
+  Módulo de caché de opcode que mejora el rendimiento de PHP al almacenar en caché el código ya compilado.
+
+- `php-pgsql`
+  Extensión que permite a PHP conectarse directamente a bases de datos PostgreSQL.
+
+- `php-pdo_pgsql`
+  Controlador PDO específico para PostgreSQL. Laravel lo utiliza cuando la conexión se configura con el driver pgsql.
+
+- `php-bcmath`
+  Proporciona funciones matemáticas de precisión arbitraria. Requerida por algunas funciones de Laravel y paquetes de terceros que trabajan con números decimales de alta precisión.
+
+✅ Nota:
+Las extensiones `php-curl`, `php-zip` y `php-intl` vienen incluidas por defecto en la instalación de PHP en Fedora. Se recomienda verificar que estén activas con `php -m | grep -E "curl|zip|intl"`.
+
+El parámetro `-y` acepta automáticamente las confirmaciones de instalación.
+
+Después de la instalación, se puede verificar la versión de PHP instalada con:
+
+```bash
+php -v
+```
+
+Esto confirma que PHP está disponible en la línea de comandos y listo para utilizarse en el entorno de desarrollo.
+
+### 3.2 Instalación de Composer
+
+**Composer** es el gestor de dependencias más utilizado en el ecosistema PHP y es una herramienta fundamental para trabajar con `Laravel`, ya que permite instalar el framework y las librerías necesarias para cada proyecto.
+
+En Fedora, Composer se puede instalar directamente desde los repositorios oficiales con el siguiente comando:
+
+```bash
+sudo dnf install composer -y
+```
+
+Este comando:
+
+- Descarga e instala el paquete `composer`.
+
+- Deja disponible el comando `composer` en la línea de comandos del sistema.
+
+- Utiliza la opción `-y` para aceptar automáticamente las confirmaciones de instalación.
+
+Una vez finalizada la instalación, se puede verificar que Composer esté correctamente instalado y disponible ejecutando:
+
+```bash
+composer -V
+```
+
+La salida mostrará la versión instalada de Composer, lo que confirma que la herramienta está lista para ser utilizada en la gestión de dependencias de proyectos PHP y Laravel.
+
+### 3.3 Reiniciar Apache para aplicar los cambios
+
+Después de instalar PHP y sus extensiones, así como Composer, es recomendable reiniciar el servicio de Apache para asegurarse de que cargue correctamente los módulos de PHP recién instalados.
+
+Para reiniciar Apache se utiliza el siguiente comando:
+
+```bash
+sudo systemctl restart httpd.service
+```
+
+Este comando:
+
+- Detiene y vuelve a iniciar el servicio `httpd`.
+
+- Hace que Apache cargue la configuración y módulos actualizados, incluyendo el soporte para PHP.
+
+Opcionalmente, se puede verificar que Apache siga en ejecución con:
+
+```bash
+systemctl status httpd.service
+```
+
+Si el servicio aparece como `active (running)` y no se muestran errores, Apache está funcionando correctamente con soporte para PHP y se puede continuar con la configuración del entorno Laravel.
+
+## 4. Instalación de Node.js y npm
+
+Laravel utiliza **Vite** como herramienta de compilación de assets (CSS, JavaScript) a partir de Laravel 9. Para ejecutar `npm run dev` y `npm run build` dentro de un proyecto Laravel es necesario tener Node.js y npm instalados en el sistema.
+
+### 4.1 Instalar Node.js y npm
+
+En Fedora, Node.js y npm se pueden instalar directamente desde los repositorios oficiales con el siguiente comando:
+
+```bash
+sudo dnf install nodejs -y
+```
+
+Este comando instala tanto Node.js como npm en su misma operación, ya que npm viene incluido como dependencia del paquete `nodejs`.
+
+### 4.2 Verificar la instalación
+
+Una vez finalizada la instalación, se puede confirmar que ambas herramientas están disponibles verificando sus versiones:
+
+```bash
+node --version
+npm --version
+```
+
+La salida mostrará las versiones instaladas, por ejemplo:
+
+```
+v22.22.2
+10.9.7
+```
+
+Con Node.js y npm disponibles, es posible instalar las dependencias de frontend de un proyecto Laravel ejecutando `npm install` dentro del directorio del proyecto, y compilar los assets con `npm run dev` (modo desarrollo) o `npm run build` (producción).
+
+## 5. Instalación de MySQL
 
 En este paso se instalará y habilitará el servidor de base de datos MySQL, que será utilizado por las aplicaciones desarrolladas con PHP y Laravel.
 
-### 3.1 Instalar el servidor MySQL
+### 5.1 Instalar el servidor MySQL
 
 Para instalar el servidor MySQL en Fedora, se ejecuta el siguiente comando:
 
@@ -109,7 +258,7 @@ sudo dnf install mysql-server
 
 Este comando descargará e instalará el paquete `mysql-server` junto con sus dependencias.
 
-### 3.2 Iniciar y habilitar el servicio MySQL
+### 5.2 Iniciar y habilitar el servicio MySQL
 
 Una vez instalado, se debe iniciar el servicio de MySQL:
 
@@ -129,7 +278,7 @@ Opcionalmente, se puede comprobar el estado del servicio con:
 systemctl status mysqld
 ```
 
-### 3.3 Configuración inicial con `mysql_secure_installation`
+### 5.3 Configuración inicial con `mysql_secure_installation`
 
 Después de la instalación, es recomendable ejecutar el asistente de configuración de seguridad de MySQL para definir la contraseña del usuario administrador (`root`) y aplicar algunas medidas básicas de seguridad.
 
@@ -219,7 +368,7 @@ All done!
 
 Con esto, la instalación de **MySQL** queda asegurada con una contraseña para `root` y con una configuración básica de seguridad adecuada para continuar con el entorno de desarrollo.
 
-### 3.4 Verificar acceso a MySQL
+### 5.4 Verificar acceso a MySQL
 
 Como último paso, es recomendable validar que el acceso al servidor MySQL funciona correctamente con el usuario `root` y la contraseña configurada en el asistente anterior.
 
@@ -233,7 +382,7 @@ Donde:
 
 - `sudo` ejecuta el comando con privilegios de superusuario.
 
-- `-u` root indica que se usará el usuario root de MySQL.
+- `-u root` indica que se usará el usuario root de MySQL.
 
 - `-p` indica que se solicitará la contraseña al iniciar sesión.
 
@@ -262,13 +411,13 @@ La salida típica incluirá al menos las siguientes bases de datos del sistema:
 
 - `mysql`
 
-- `performance_schema
+- `performance_schema`
 
 - `sys`
 
 Si se puede iniciar sesión correctamente y se muestran estas bases de datos sin errores, se puede considerar que la instalación y configuración básica de MySQL se ha realizado con éxito y que el servidor está listo para utilizarse en el entorno de desarrollo.
 
-### 3.5 Crear usuario con acceso completo (recomendado en desarrollo)
+### 5.5 Crear usuario con acceso completo (recomendado en desarrollo)
 
 Por defecto, el único usuario con acceso total en MySQL es `root`. Para el trabajo diario en desarrollo es conveniente crear un usuario propio con privilegios completos sobre todas las bases de datos, evitando así usar `root` directamente.
 
@@ -316,123 +465,11 @@ El valor `Y` en `Super_priv` confirma que el usuario tiene privilegios de superu
 ✅ Nota:
 Otorgar todos los privilegios es adecuado en entornos de desarrollo local. En producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios para cada aplicación.
 
-## 4. Instalación de PHP y Composer
-
-En este paso se instalará PHP junto con un conjunto de extensiones comunes necesarias para trabajar con Laravel y aplicaciones web en general. Posteriormente se verá la instalación de Composer.
-
-### 4.1 Instalación de PHP y extensiones comunes
-
-Para instalar PHP y algunas extensiones recomendadas para Laravel, se puede utilizar el siguiente comando:
-
-```bash
-sudo dnf install php php-mysqlnd php-pdo php-gd php-mbstring php-xml php-cli php-common php-json php-opcache php-pgsql php-pdo_pgsql -y
-```
-
-Este comando instala:
-
-- `php`
-  Paquete principal de PHP (intérprete del lenguaje).
-
-- `php-mysqlnd`
-  Controlador nativo de MySQL para PHP. Permite que PHP se conecte a bases de datos MySQL/MariaDB.
-
-- `php-pdo`
-  Proporciona la capa PDO (PHP Data Objects), utilizada por Laravel para conectarse a bases de datos de forma abstracta.
-
-- `php-gd`
-  Librería para manipulación de imágenes (redimensionar, recortar, generar imágenes, etc.).
-
-- `php-mbstring`
-  Extensión para manejar cadenas multibyte (UTF-8, acentos, caracteres especiales). Es requerida por Laravel y muchas librerías.
-
-- `php-xml`
-  Permite trabajar con XML, necesario para ciertas extensiones y herramientas del ecosistema PHP.
-
-- `php-cli`
-  Versión de PHP para línea de comandos. Es esencial para ejecutar Artisan, Composer y otros scripts.
-
-- `php-common`
-  Archivos comunes compartidos por distintos módulos de PHP.
-
-- `php-json`
-  Soporte para JSON, ampliamente utilizado en APIs y respuestas de Laravel.
-
-- `php-opcache`
-  Módulo de caché de opcode que mejora el rendimiento de PHP al almacenar en caché el código ya compilado.
-
-- `php-pgsql`
-  Extensión que permite a PHP conectarse directamente a bases de datos PostgreSQL.
-
-- `php-pdo_pgsql`
-  Controlador PDO específico para PostgreSQL. Laravel lo utiliza cuando la conexión se configura con el driver pgsql.
-
-El parámetro `-y` acepta automáticamente las confirmaciones de instalación.
-
-Después de la instalación, se puede verificar la versión de PHP instalada con:
-
-```bash
-php -v
-```
-
-Esto confirma que PHP está disponible en la línea de comandos y listo para utilizarse en el entorno de desarrollo.
-
-### 4.2 Instalación de Composer
-
-**Composer** es el gestor de dependencias más utilizado en el ecosistema PHP y es una herramienta fundamental para trabajar con `Laravel`, ya que permite instalar el framework y las librerías necesarias para cada proyecto.
-
-En Fedora, Composer se puede instalar directamente desde los repositorios oficiales con el siguiente comando:
-
-```bash
-sudo dnf install composer -y
-```
-
-Este comando:
-
-- Descarga e instala el paquete `composer`.
-
-- Deja disponible el comando `composer` en la línea de comandos del sistema.
-
-- Utiliza la opción `-y` para aceptar automáticamente las confirmaciones de instalación.
-
-Una vez finalizada la instalación, se puede verificar que Composer esté correctamente instalado y disponible ejecutando:
-
-Una vez finalizada la instalación, se puede verificar que Composer esté correctamente instalado y disponible ejecutando:
-
-```bash
-composer -V
-```
-
-La salida mostrará la versión instalada de Composer, lo que confirma que la herramienta está lista para ser utilizada en la gestión de dependencias de proyectos PHP y Laravel.
-
-### 4.3 Reiniciar Apache para aplicar los cambios
-
-Después de instalar PHP y sus extensiones, así como Composer, es recomendable reiniciar el servicio de Apache para asegurarse de que cargue correctamente los módulos de PHP recién instalados.
-
-Para reiniciar Apache se utiliza el siguiente comando:
-
-```bash
-sudo systemctl restart httpd.service
-```
-
-Este comando:
-
-- Detiene y vuelve a iniciar el servicio `httpd`.
-
-- Hace que Apache cargue la configuración y módulos actualizados, incluyendo el soporte para PHP.
-
-Opcionalmente, se puede verificar que Apache siga en ejecución con:
-
-```bash
-systemctl status httpd.service
-```
-
-Si el servicio aparece como `active (running)` y no se muestran errores, Apache está funcionando correctamente con soporte para PHP y se puede continuar con la configuración del entorno Laravel.
-
-## 5. Instalación de PostgreSQL
+## 6. Instalación de PostgreSQL
 
 En este paso se instalará y configurará el servidor de base de datos **PostgreSQL**, que puede utilizarse como alternativa a MySQL en proyectos Laravel.
 
-### 5.1 Instalar el servidor PostgreSQL
+### 6.1 Instalar el servidor PostgreSQL
 
 Para instalar PostgreSQL en Fedora, se ejecuta el siguiente comando:
 
@@ -442,7 +479,7 @@ sudo dnf install postgresql-server -y
 
 Este comando descargará e instalará el paquete `postgresql-server` junto con sus dependencias.
 
-### 5.2 Inicializar el clúster de base de datos
+### 6.2 Inicializar el clúster de base de datos
 
 A diferencia de MySQL, PostgreSQL requiere un paso adicional antes de iniciar el servicio: inicializar el directorio de datos. Esto se realiza con:
 
@@ -459,7 +496,7 @@ La salida esperada es similar a:
  * Initialized, logs are in /var/lib/pgsql/initdb_postgresql.log
 ```
 
-### 5.3 Iniciar y habilitar el servicio PostgreSQL
+### 6.3 Iniciar y habilitar el servicio PostgreSQL
 
 Una vez inicializado, se inicia el servicio:
 
@@ -479,7 +516,7 @@ Se puede verificar que el servicio está activo con:
 systemctl status postgresql
 ```
 
-### 5.4 Crear usuario y base de datos
+### 6.4 Crear usuario y base de datos
 
 PostgreSQL utiliza el usuario del sistema `postgres` como administrador. Para acceder al intérprete interactivo de PostgreSQL (`psql`) con ese usuario se ejecuta:
 
@@ -501,7 +538,7 @@ Donde:
 - `CREATE DATABASE ... OWNER` crea la base de datos y asigna el usuario como propietario.
 - `\q` cierra el intérprete `psql`.
 
-### 5.5 Verificar acceso a PostgreSQL
+### 6.5 Verificar acceso a PostgreSQL
 
 Para confirmar que el usuario y la base de datos creados funcionan correctamente, se puede intentar una conexión directa:
 
@@ -520,7 +557,7 @@ Si la conexión es exitosa, `psql` solicitará la contraseña y mostrará una ta
 
 Con esto, la instalación y configuración básica de **PostgreSQL** queda lista para utilizarse en proyectos Laravel.
 
-### 5.6 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
+### 6.6 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
 
 Por defecto, el usuario creado en el paso anterior solo tiene acceso a la base de datos de la que es propietario. Para un entorno de desarrollo local es conveniente otorgarle privilegios de **superusuario**, lo que permite crear, eliminar y acceder a cualquier base de datos sin necesidad de usar el usuario `postgres`.
 
