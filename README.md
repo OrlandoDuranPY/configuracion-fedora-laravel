@@ -268,6 +268,54 @@ La salida típica incluirá al menos las siguientes bases de datos del sistema:
 
 Si se puede iniciar sesión correctamente y se muestran estas bases de datos sin errores, se puede considerar que la instalación y configuración básica de MySQL se ha realizado con éxito y que el servidor está listo para utilizarse en el entorno de desarrollo.
 
+### 3.5 Crear usuario con acceso completo (recomendado en desarrollo)
+
+Por defecto, el único usuario con acceso total en MySQL es `root`. Para el trabajo diario en desarrollo es conveniente crear un usuario propio con privilegios completos sobre todas las bases de datos, evitando así usar `root` directamente.
+
+Para acceder a MySQL como `root` y crear el nuevo usuario:
+
+```bash
+sudo mysql -u root -p
+```
+
+Dentro del monitor de MySQL se ejecutan los siguientes comandos:
+
+```sql
+CREATE USER 'nombre_usuario'@'localhost' IDENTIFIED BY 'contraseña_segura';
+GRANT ALL PRIVILEGES ON *.* TO 'nombre_usuario'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+\q
+```
+
+Donde:
+
+- `CREATE USER` crea el nuevo usuario con su contraseña.
+- `GRANT ALL PRIVILEGES ON *.*` otorga permisos sobre todas las bases de datos (`*`) y todas las tablas (`*`).
+- `WITH GRANT OPTION` permite que el usuario pueda a su vez otorgar privilegios a otros usuarios.
+- `FLUSH PRIVILEGES` aplica los cambios inmediatamente en el servidor.
+- `\q` cierra el monitor de MySQL.
+
+Para verificar que el usuario fue creado correctamente con privilegios de superusuario:
+
+```bash
+sudo mysql -u root -p -e "SELECT user, host, Super_priv FROM mysql.user WHERE user='nombre_usuario';"
+```
+
+La salida esperada es:
+
+```
++----------------+-----------+------------+
+| user           | host      | Super_priv |
++----------------+-----------+------------+
+| nombre_usuario | localhost | Y          |
++----------------+-----------+------------+
+```
+
+El valor `Y` en `Super_priv` confirma que el usuario tiene privilegios de superusuario sobre el servidor MySQL.
+
+✅ Nota:
+Otorgar todos los privilegios es adecuado en entornos de desarrollo local. En producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios para cada aplicación.
+
 ## 4. Instalación de PHP y Composer
 
 En este paso se instalará PHP junto con un conjunto de extensiones comunes necesarias para trabajar con Laravel y aplicaciones web en general. Posteriormente se verá la instalación de Composer.
@@ -379,3 +427,124 @@ systemctl status httpd.service
 ```
 
 Si el servicio aparece como `active (running)` y no se muestran errores, Apache está funcionando correctamente con soporte para PHP y se puede continuar con la configuración del entorno Laravel.
+
+## 5. Instalación de PostgreSQL
+
+En este paso se instalará y configurará el servidor de base de datos **PostgreSQL**, que puede utilizarse como alternativa a MySQL en proyectos Laravel.
+
+### 5.1 Instalar el servidor PostgreSQL
+
+Para instalar PostgreSQL en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install postgresql-server -y
+```
+
+Este comando descargará e instalará el paquete `postgresql-server` junto con sus dependencias.
+
+### 5.2 Inicializar el clúster de base de datos
+
+A diferencia de MySQL, PostgreSQL requiere un paso adicional antes de iniciar el servicio: inicializar el directorio de datos. Esto se realiza con:
+
+```bash
+sudo postgresql-setup --initdb
+```
+
+Este comando crea la estructura inicial de archivos y directorios necesarios para que PostgreSQL funcione, ubicados en `/var/lib/pgsql/data/`.
+
+La salida esperada es similar a:
+
+```
+ * Initializing database in '/var/lib/pgsql/data'
+ * Initialized, logs are in /var/lib/pgsql/initdb_postgresql.log
+```
+
+### 5.3 Iniciar y habilitar el servicio PostgreSQL
+
+Una vez inicializado, se inicia el servicio:
+
+```bash
+sudo systemctl start postgresql
+```
+
+Para que el servicio se inicie automáticamente en cada arranque del sistema:
+
+```bash
+sudo systemctl enable postgresql
+```
+
+Se puede verificar que el servicio está activo con:
+
+```bash
+systemctl status postgresql
+```
+
+### 5.4 Crear usuario y base de datos
+
+PostgreSQL utiliza el usuario del sistema `postgres` como administrador. Para acceder al intérprete interactivo de PostgreSQL (`psql`) con ese usuario se ejecuta:
+
+```bash
+sudo -u postgres psql
+```
+
+Dentro del prompt de `psql`, se crea un usuario y una base de datos para el proyecto:
+
+```sql
+CREATE USER nombre_usuario WITH PASSWORD 'contraseña_segura';
+CREATE DATABASE nombre_base_de_datos OWNER nombre_usuario;
+\q
+```
+
+Donde:
+
+- `CREATE USER` crea un nuevo rol de base de datos con contraseña.
+- `CREATE DATABASE ... OWNER` crea la base de datos y asigna el usuario como propietario.
+- `\q` cierra el intérprete `psql`.
+
+### 5.5 Verificar acceso a PostgreSQL
+
+Para confirmar que el usuario y la base de datos creados funcionan correctamente, se puede intentar una conexión directa:
+
+```bash
+psql -U nombre_usuario -d nombre_base_de_datos -h 127.0.0.1 -c "\conninfo"
+```
+
+Donde:
+
+- `-U` especifica el usuario de PostgreSQL con el que se conecta.
+- `-d` indica la base de datos a la que se conecta.
+- `-h 127.0.0.1` indica que la conexión se realiza a través de TCP/IP al host local.
+- `-c "\conninfo"` ejecuta el comando `\conninfo`, que muestra los detalles de la conexión activa.
+
+Si la conexión es exitosa, `psql` solicitará la contraseña y mostrará una tabla con la información de la sesión, incluyendo la base de datos, el usuario, el host y el puerto (`5432` por defecto).
+
+Con esto, la instalación y configuración básica de **PostgreSQL** queda lista para utilizarse en proyectos Laravel.
+
+### 5.6 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
+
+Por defecto, el usuario creado en el paso anterior solo tiene acceso a la base de datos de la que es propietario. Para un entorno de desarrollo local es conveniente otorgarle privilegios de **superusuario**, lo que permite crear, eliminar y acceder a cualquier base de datos sin necesidad de usar el usuario `postgres`.
+
+Para elevar los privilegios del usuario se ejecuta:
+
+```bash
+sudo -u postgres psql -c "ALTER USER nombre_usuario WITH SUPERUSER;"
+```
+
+Para verificar que el cambio se aplicó correctamente:
+
+```bash
+sudo -u postgres psql -c "\du"
+```
+
+La salida mostrará el listado de roles. El usuario debe aparecer con el atributo `Superusuario`:
+
+```
+                          Listado de roles
+ Nombre de rol  |                         Atributos
+----------------+------------------------------------------------------------
+ nombre_usuario | Superusuario
+ postgres       | Superusuario, Crear rol, Crear BD, Replicación, Ignora RLS
+```
+
+✅ Nota:
+Otorgar privilegios de superusuario es adecuado en entornos de desarrollo local. En entornos de producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios.
