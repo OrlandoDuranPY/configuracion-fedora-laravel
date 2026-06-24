@@ -585,3 +585,149 @@ La salida mostrará el listado de roles. El usuario debe aparecer con el atribut
 
 ✅ Nota:
 Otorgar privilegios de superusuario es adecuado en entornos de desarrollo local. En entornos de producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios.
+
+## 7. Instalación de Nginx (alternativa a Apache)
+
+**Nginx** es un servidor web de alto rendimiento que puede utilizarse como alternativa a Apache para servir aplicaciones PHP y Laravel. Se destaca por su bajo consumo de recursos y su eficiencia en el manejo de conexiones concurrentes.
+
+> ⚠️ Si ya tienes Apache (`httpd`) instalado y en ejecución, detén el servicio antes de iniciar Nginx, ya que ambos compiten por el puerto 80:
+>
+> ```bash
+> sudo systemctl stop httpd.service
+> sudo systemctl disable httpd.service
+> ```
+
+### 7.1 Instalar Nginx
+
+Para instalar Nginx en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install nginx -y
+```
+
+### 7.2 Iniciar y habilitar el servicio
+
+Una vez instalado, se inicia el servicio y se configura para arrancar automáticamente con el sistema:
+
+```bash
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+Para verificar que el servicio está activo:
+
+```bash
+systemctl status nginx
+```
+
+Si aparece como `active (running)`, Nginx está funcionando correctamente.
+
+### 7.3 Instalar PHP-FPM
+
+A diferencia de Apache, Nginx no ejecuta PHP de forma nativa. Necesita comunicarse con el proceso **PHP-FPM** (FastCGI Process Manager) para procesar archivos PHP.
+
+Para instalar PHP-FPM:
+
+```bash
+sudo dnf install php-fpm -y
+```
+
+Luego se inicia y habilita el servicio:
+
+```bash
+sudo systemctl start php-fpm
+sudo systemctl enable php-fpm
+```
+
+Se puede comprobar su estado con:
+
+```bash
+systemctl status php-fpm
+```
+
+### 7.4 Configurar un Virtual Host para Laravel
+
+Nginx utiliza archivos de configuración en `/etc/nginx/conf.d/` para definir los sitios que va a servir. A continuación se muestra una configuración básica para un proyecto Laravel.
+
+Crear el archivo de configuración del sitio:
+
+```bash
+sudo nano /etc/nginx/conf.d/laravel.conf
+```
+
+Y añadir el siguiente contenido (ajusta `server_name` y `root` según tu proyecto):
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+
+    root /var/www/html/mi-proyecto-laravel/public;
+    index index.php index.html;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass   unix:/run/php-fpm/www.sock;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include        fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+Donde:
+
+- `root` apunta al directorio `public/` del proyecto Laravel, que es el punto de entrada de la aplicación.
+- `try_files` redirige todas las peticiones al `index.php` de Laravel si el archivo o directorio no existe físicamente (necesario para el enrutamiento de Laravel).
+- `fastcgi_pass unix:/run/php-fpm/www.sock` indica a Nginx que delegue la ejecución de PHP al proceso PHP-FPM a través de un socket Unix.
+- El bloque `location ~ /\.` niega el acceso a archivos ocultos como `.env`.
+
+### 7.5 Verificar la configuración y reiniciar Nginx
+
+Antes de reiniciar Nginx, es recomendable verificar que la sintaxis del archivo de configuración sea correcta:
+
+```bash
+sudo nginx -t
+```
+
+La salida esperada, si no hay errores, es:
+
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+Si la verificación es exitosa, se aplican los cambios reiniciando el servicio:
+
+```bash
+sudo systemctl restart nginx
+```
+
+### 7.6 Ajustar permisos para Nginx
+
+El proceso Nginx corre bajo el usuario `nginx`. Para que pueda leer los archivos del proyecto Laravel en `/var/www/html/`, es necesario que el directorio y sus contenidos sean accesibles para ese usuario.
+
+Una forma sencilla en entornos de desarrollo es añadir el usuario `nginx` al grupo del usuario propietario del directorio, o bien ajustar los permisos:
+
+```bash
+sudo usermod -aG orlandoduranpy nginx
+```
+
+Luego reiniciar PHP-FPM y Nginx para que el cambio de grupo surta efecto:
+
+```bash
+sudo systemctl restart php-fpm
+sudo systemctl restart nginx
+```
+
+✅ Nota:
+En entornos de producción se recomienda configurar los permisos con mayor precisión, asegurándose de que solo los directorios de almacenamiento (`storage/`) y caché (`bootstrap/cache/`) tengan permisos de escritura para el servidor web.
