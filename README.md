@@ -10,7 +10,10 @@ A lo largo de esta guía configuraremos los componentes necesarios para trabajar
 - Instalación de **Node.js** y **npm**.
 - Instalación y configuración de **MySQL**.
 - Instalación y configuración de **PostgreSQL**.
-- Instalación y configuración de **phpMyAdmin**.
+- Instalación y configuración de **Nginx** (alternativa a Apache).
+- Instalación y configuración de **Redis**.
+- Instalación y configuración de **Mailpit**.
+- Instalación de **DBeaver** como administrador gráfico de bases de datos.
 - Ajustes adicionales útiles para el desarrollo con Laravel.
 
 El objetivo final es contar con un entorno de desarrollo estable, reproducible y fácil de mantener para proyectos basados en PHP/Laravel.
@@ -516,7 +519,52 @@ Se puede verificar que el servicio está activo con:
 systemctl status postgresql
 ```
 
-### 6.4 Crear usuario y base de datos
+### 6.4 Habilitar conexiones por TCP/IP
+
+Por defecto, PostgreSQL en Fedora solo acepta conexiones a través de un **socket Unix**, no por TCP/IP. Esto es suficiente para acceder con `sudo -u postgres psql`, pero impide que herramientas como **DBeaver**, Laravel o cualquier cliente que se conecte vía `host:puerto` puedan establecer la conexión (se obtiene un error de tipo `Connection refused`).
+
+Para habilitarlo, se edita el archivo de configuración principal:
+
+```bash
+sudo nano /var/lib/pgsql/data/postgresql.conf
+```
+
+Y se descomenta (quitando el `#`) la siguiente línea:
+
+```
+listen_addresses = 'localhost'
+```
+
+### 6.5 Configurar el método de autenticación
+
+Por defecto, `pg_hba.conf` utiliza el método de autenticación **`ident`** para las conexiones por host, el cual valida la identidad contra el usuario del sistema operativo en lugar de pedir una contraseña. Esto provoca el error `la autentificación Ident falló para el usuario`.
+
+Se edita el archivo:
+
+```bash
+sudo nano /var/lib/pgsql/data/pg_hba.conf
+```
+
+Y se cambia el método `ident` por `scram-sha-256` en las líneas correspondientes a `127.0.0.1/32` y `::1/128`:
+
+```
+host    all             all             127.0.0.1/32            scram-sha-256
+host    all             all             ::1/128                 scram-sha-256
+```
+
+Después de modificar ambos archivos, se reinicia el servicio para aplicar los cambios:
+
+```bash
+sudo systemctl restart postgresql
+```
+
+Se puede confirmar que PostgreSQL ya está escuchando en el puerto TCP con:
+
+```bash
+sudo ss -tlnp | grep 5432
+```
+
+### 6.6 Crear usuario y base de datos
 
 PostgreSQL utiliza el usuario del sistema `postgres` como administrador. Para acceder al intérprete interactivo de PostgreSQL (`psql`) con ese usuario se ejecuta:
 
@@ -538,7 +586,7 @@ Donde:
 - `CREATE DATABASE ... OWNER` crea la base de datos y asigna el usuario como propietario.
 - `\q` cierra el intérprete `psql`.
 
-### 6.5 Verificar acceso a PostgreSQL
+### 6.7 Verificar acceso a PostgreSQL
 
 Para confirmar que el usuario y la base de datos creados funcionan correctamente, se puede intentar una conexión directa:
 
@@ -557,7 +605,7 @@ Si la conexión es exitosa, `psql` solicitará la contraseña y mostrará una ta
 
 Con esto, la instalación y configuración básica de **PostgreSQL** queda lista para utilizarse en proyectos Laravel.
 
-### 6.6 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
+### 6.8 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
 
 Por defecto, el usuario creado en el paso anterior solo tiene acceso a la base de datos de la que es propietario. Para un entorno de desarrollo local es conveniente otorgarle privilegios de **superusuario**, lo que permite crear, eliminar y acceder a cualquier base de datos sin necesidad de usar el usuario `postgres`.
 
@@ -731,3 +779,259 @@ sudo systemctl restart nginx
 
 ✅ Nota:
 En entornos de producción se recomienda configurar los permisos con mayor precisión, asegurándose de que solo los directorios de almacenamiento (`storage/`) y caché (`bootstrap/cache/`) tengan permisos de escritura para el servidor web.
+
+## 8. Instalación de Redis
+
+**Redis** es una base de datos en memoria que Laravel puede utilizar como backend para **caché**, **sesiones** y **colas** (`queues`), ofreciendo un rendimiento muy superior al de los drivers basados en archivos o en base de datos.
+
+### 8.1 Instalar el servidor Redis
+
+Para instalar Redis en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install redis -y
+```
+
+### 8.2 Iniciar y habilitar el servicio
+
+Una vez instalado, se inicia el servicio y se habilita para que arranque junto con el sistema:
+
+```bash
+sudo systemctl start redis
+sudo systemctl enable redis
+```
+
+Se puede comprobar que el servicio está activo con:
+
+```bash
+systemctl status redis
+```
+
+### 8.3 Verificar el funcionamiento de Redis
+
+Redis incluye un cliente de línea de comandos (`redis-cli`) que permite probar la conexión al servidor:
+
+```bash
+redis-cli ping
+```
+
+Si el servidor responde correctamente, la salida será:
+
+```
+PONG
+```
+
+### 8.4 Instalar la extensión de PHP para Redis
+
+Para que Laravel pueda comunicarse con Redis a través de PHP, es necesario instalar la extensión `php-redis`:
+
+```bash
+sudo dnf install php-redis -y
+```
+
+✅ Nota:
+En Fedora, `php-redis` es un alias del paquete real `php-pecl-redis6`. Si al ejecutar el comando anterior aparece un mensaje indicando que `php-pecl-redis6` ya está instalado, significa que la extensión ya se encuentra disponible y no es necesario hacer nada más en este paso.
+
+Después de instalar la extensión, se debe reiniciar el servicio PHP correspondiente para que los cambios surtan efecto, según el servidor web utilizado:
+
+**Si usas Apache:**
+
+```bash
+sudo systemctl restart httpd.service
+```
+
+**Si usas Nginx (con PHP-FPM):**
+
+```bash
+sudo systemctl restart php-fpm
+sudo systemctl restart nginx
+```
+
+Para confirmar que la extensión está activa:
+
+```bash
+php -m | grep redis
+```
+
+Si la salida muestra `redis`, la extensión está correctamente instalada y disponible para Laravel.
+
+### 8.5 Configurar Laravel para utilizar Redis
+
+En el archivo `.env` del proyecto Laravel, se deben ajustar las variables de conexión a Redis:
+
+```env
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+CACHE_STORE=redis
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+```
+
+Donde:
+
+- `CACHE_STORE=redis` indica a Laravel que utilice Redis como almacén de caché.
+- `SESSION_DRIVER=redis` hace que las sesiones de usuario se gestionen a través de Redis.
+- `QUEUE_CONNECTION=redis` permite que los `jobs` encolados se procesen utilizando Redis como backend de colas.
+
+✅ Nota:
+Por defecto, Redis en Fedora solo acepta conexiones locales (`127.0.0.1`), lo cual es adecuado para un entorno de desarrollo. En producción se recomienda configurar una contraseña (`requirepass` en `/etc/redis/redis.conf`) y restringir el acceso únicamente a los hosts necesarios.
+
+## 9. Instalación de Mailpit
+
+**Mailpit** es un servidor SMTP de pruebas que captura todos los correos enviados por la aplicación durante el desarrollo, sin entregarlos realmente a destinatarios externos. Permite visualizar los correos enviados por Laravel (registro de usuarios, recuperación de contraseña, notificaciones, etc.) a través de una interfaz web.
+
+### 9.1 Descargar el binario de Mailpit
+
+Mailpit no está disponible en los repositorios oficiales de Fedora, por lo que se instala mediante su script oficial de instalación:
+
+```bash
+sudo bash -c "$(curl -sL https://raw.githubusercontent.com/axllent/mailpit/develop/install.sh)"
+```
+
+Este comando descarga el binario de Mailpit correspondiente a la arquitectura del sistema y lo instala en `/usr/local/bin/mailpit`.
+
+✅ Nota:
+Es recomendable revisar el script en el repositorio oficial de [Mailpit](https://github.com/axllent/mailpit) antes de ejecutarlo, como buena práctica de seguridad al instalar software mediante scripts de terceros.
+
+### 9.2 Crear un servicio systemd para Mailpit
+
+Para que Mailpit se ejecute como un servicio en segundo plano y se inicie automáticamente con el sistema, se crea un archivo de unidad de systemd:
+
+```bash
+sudo nano /etc/systemd/system/mailpit.service
+```
+
+Con el siguiente contenido:
+
+```ini
+[Unit]
+Description=Mailpit SMTP Test Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/mailpit --listen 127.0.0.1:8025 --smtp 127.0.0.1:1025
+Restart=on-failure
+User=orlandoduranpy
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Donde:
+
+- `--listen 127.0.0.1:8025` define el puerto de la interfaz web donde se visualizan los correos capturados.
+- `--smtp 127.0.0.1:1025` define el puerto SMTP que utilizará Laravel para enviar los correos.
+- `User=orlandoduranpy` ejecuta el proceso bajo el usuario del sistema en lugar de `root`.
+
+### 9.3 Iniciar y habilitar el servicio
+
+Después de crear el archivo de servicio, se recarga la configuración de systemd y se inicia Mailpit:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start mailpit
+sudo systemctl enable mailpit
+```
+
+Se puede verificar el estado del servicio con:
+
+```bash
+systemctl status mailpit
+```
+
+### 9.4 Acceder a la interfaz web de Mailpit
+
+Una vez iniciado el servicio, la interfaz web de Mailpit estará disponible en:
+
+```
+http://127.0.0.1:8025
+```
+
+Desde esta interfaz se pueden visualizar todos los correos capturados, junto con su contenido en HTML y texto plano.
+
+### 9.5 Configurar Laravel para utilizar Mailpit
+
+En el archivo `.env` del proyecto Laravel, se deben ajustar las variables de configuración de correo:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS="hola@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+Con esta configuración, cualquier correo enviado desde Laravel (mediante `Mail::send`, notificaciones, etc.) será capturado por Mailpit y podrá visualizarse desde su interfaz web, en lugar de ser entregado a un servidor de correo real.
+
+✅ Nota:
+Mailpit es ideal únicamente para entornos de desarrollo. En producción se debe configurar un proveedor de correo real (SMTP, Mailgun, SES, etc.).
+
+## 10. Instalación de DBeaver
+
+**DBeaver** es un administrador gráfico de bases de datos de código libre, compatible con MySQL, PostgreSQL y muchos otros motores. Permite explorar bases de datos, ejecutar consultas SQL, editar datos y administrar conexiones desde una interfaz de escritorio, como alternativa a herramientas como phpMyAdmin.
+
+### 10.1 Instalar DBeaver mediante Flatpak
+
+En Fedora, la forma más sencilla de instalar DBeaver es a través de **Flatpak**, ya que no está disponible en los repositorios oficiales de `dnf`.
+
+Si Flatpak no está habilitado en el sistema, primero se agrega el repositorio de Flathub:
+
+```bash
+sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+```
+
+Luego se instala DBeaver Community Edition:
+
+```bash
+flatpak install flathub io.dbeaver.DBeaverCommunity -y
+```
+
+### 10.2 Iniciar DBeaver
+
+Una vez instalado, se puede iniciar desde el menú de aplicaciones de Fedora, o ejecutando:
+
+```bash
+flatpak run io.dbeaver.DBeaverCommunity
+```
+
+### 10.3 Conectarse a MySQL desde DBeaver
+
+Para crear una nueva conexión a MySQL:
+
+1. Abrir DBeaver y hacer clic en **Nueva conexión a base de datos** (icono del enchufe).
+2. Seleccionar **MySQL** en la lista de controladores.
+3. Completar los datos de conexión:
+   - **Host:** `127.0.0.1`
+   - **Puerto:** `3306`
+   - **Usuario:** el usuario creado en la sección 5.5 (`nombre_usuario`).
+   - **Contraseña:** la contraseña configurada para ese usuario.
+4. Hacer clic en **Probar conexión...** para verificar que los datos son correctos.
+5. Si DBeaver solicita descargar el controlador JDBC de MySQL la primera vez, aceptar la descarga.
+6. Hacer clic en **Finalizar** para guardar la conexión.
+
+### 10.4 Conectarse a PostgreSQL desde DBeaver
+
+Para crear una nueva conexión a PostgreSQL:
+
+1. Abrir DBeaver y hacer clic en **Nueva conexión a base de datos**.
+2. Seleccionar **PostgreSQL** en la lista de controladores.
+3. Completar los datos de conexión:
+   - **Host:** `127.0.0.1`
+   - **Puerto:** `5432`
+   - **Base de datos:** la base de datos creada en la sección 6.6 (`nombre_base_de_datos`).
+   - **Usuario:** el usuario creado en esa misma sección (`nombre_usuario`).
+   - **Contraseña:** la contraseña configurada para ese usuario.
+4. Hacer clic en **Probar conexión...** para verificar que los datos son correctos.
+5. Si DBeaver solicita descargar el controlador JDBC de PostgreSQL la primera vez, aceptar la descarga.
+6. Hacer clic en **Finalizar** para guardar la conexión.
+
+✅ Nota:
+Si el usuario de PostgreSQL fue elevado a superusuario (sección 6.8), también podrá visualizar y administrar el resto de bases de datos del servidor desde la misma conexión en DBeaver.
+
+✅ Nota:
+Si al conectarte obtienes el error `Connection refused`, revisa que hayas habilitado las conexiones por TCP/IP (sección 6.4). Si obtienes un error de autenticación tipo `la autentificación Ident falló`, revisa el método configurado en `pg_hba.conf` (sección 6.5).
