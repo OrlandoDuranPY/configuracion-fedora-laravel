@@ -5,12 +5,12 @@ Este repositorio tiene como objetivo documentar la configuración de un entorno 
 A lo largo de esta guía configuraremos los componentes necesarios para trabajar de forma cómoda y ordenada con estas tecnologías, cubriendo, entre otros, los siguientes temas:
 
 - Instalación y configuración de **Apache**.
+- Instalación y configuración de **Nginx** (alternativa a Apache).
 - Asignación de permisos a la carpeta `/var/www/html/`.
 - Instalación de **PHP** y **Composer**.
 - Instalación de **Node.js** y **npm**.
 - Instalación y configuración de **MySQL**.
 - Instalación y configuración de **PostgreSQL**.
-- Instalación y configuración de **Nginx** (alternativa a Apache).
 - Instalación y configuración de **Redis**.
 - Instalación y configuración de **Mailpit**.
 - Instalación de **DBeaver** como administrador gráfico de bases de datos.
@@ -56,7 +56,157 @@ sudo systemctl enable httpd.service
 
 Con esto, el servicio httpd quedará instalado, iniciado y configurado para arrancar automáticamente con Fedora Workstation.
 
-## 2. Asignar permisos a `/var/www/html/`
+## 2. Instalación de Nginx (alternativa a Apache)
+
+**Nginx** es un servidor web de alto rendimiento que puede utilizarse como alternativa a Apache para servir aplicaciones PHP y Laravel. Se destaca por su bajo consumo de recursos y su eficiencia en el manejo de conexiones concurrentes.
+
+Se usa **uno u otro**, no ambos a la vez: por defecto Apache y Nginx compiten por el puerto 80. Si prefieres Nginx, sigue esta sección; si te quedas con Apache (sección 1), puedes omitirla.
+
+> ⚠️ Si ya tienes Apache (`httpd`) instalado y en ejecución, detén el servicio antes de iniciar Nginx, ya que ambos compiten por el puerto 80:
+>
+> ```bash
+> sudo systemctl stop httpd.service
+> sudo systemctl disable httpd.service
+> ```
+
+### 2.1 Instalar Nginx
+
+Para instalar Nginx en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install nginx -y
+```
+
+### 2.2 Iniciar y habilitar el servicio
+
+Una vez instalado, se inicia el servicio y se configura para arrancar automáticamente con el sistema:
+
+```bash
+sudo systemctl start nginx
+sudo systemctl enable nginx
+```
+
+Para verificar que el servicio está activo:
+
+```bash
+systemctl status nginx
+```
+
+Si aparece como `active (running)`, Nginx está funcionando correctamente.
+
+### 2.3 Instalar PHP-FPM
+
+A diferencia de Apache, Nginx no ejecuta PHP de forma nativa. Necesita comunicarse con el proceso **PHP-FPM** (FastCGI Process Manager) para procesar archivos PHP.
+
+Para instalar PHP-FPM:
+
+```bash
+sudo dnf install php-fpm -y
+```
+
+> Nota: PHP se instala en detalle en la sección **4. Instalación de PHP y Composer**. Este comando instala el componente `php-fpm`; si todavía no has instalado PHP, se instalará junto con sus dependencias.
+
+Luego se inicia y habilita el servicio:
+
+```bash
+sudo systemctl start php-fpm
+sudo systemctl enable php-fpm
+```
+
+Se puede comprobar su estado con:
+
+```bash
+systemctl status php-fpm
+```
+
+### 2.4 Configurar un Virtual Host para Laravel
+
+Nginx utiliza archivos de configuración en `/etc/nginx/conf.d/` para definir los sitios que va a servir. A continuación se muestra una configuración básica para un proyecto Laravel.
+
+Crear el archivo de configuración del sitio:
+
+```bash
+sudo nano /etc/nginx/conf.d/laravel.conf
+```
+
+Y añadir el siguiente contenido (ajusta `server_name` y `root` según tu proyecto):
+
+```nginx
+server {
+    listen 80;
+    server_name localhost;
+
+    root /var/www/html/mi-proyecto-laravel/public;
+    index index.php index.html;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass   unix:/run/php-fpm/www.sock;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include        fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+Donde:
+
+- `root` apunta al directorio `public/` del proyecto Laravel, que es el punto de entrada de la aplicación.
+- `try_files` redirige todas las peticiones al `index.php` de Laravel si el archivo o directorio no existe físicamente (necesario para el enrutamiento de Laravel).
+- `fastcgi_pass unix:/run/php-fpm/www.sock` indica a Nginx que delegue la ejecución de PHP al proceso PHP-FPM a través de un socket Unix.
+- El bloque `location ~ /\.` niega el acceso a archivos ocultos como `.env`.
+
+### 2.5 Verificar la configuración y reiniciar Nginx
+
+Antes de reiniciar Nginx, es recomendable verificar que la sintaxis del archivo de configuración sea correcta:
+
+```bash
+sudo nginx -t
+```
+
+La salida esperada, si no hay errores, es:
+
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+Si la verificación es exitosa, se aplican los cambios reiniciando el servicio:
+
+```bash
+sudo systemctl restart nginx
+```
+
+### 2.6 Ajustar permisos para Nginx
+
+El proceso Nginx corre bajo el usuario `nginx`. Para que pueda leer los archivos del proyecto Laravel en `/var/www/html/`, es necesario que el directorio y sus contenidos sean accesibles para ese usuario.
+
+Una forma sencilla en entornos de desarrollo es añadir el usuario `nginx` al grupo del usuario propietario del directorio, o bien ajustar los permisos:
+
+```bash
+sudo usermod -aG orlandoduranpy nginx
+```
+
+Luego reiniciar PHP-FPM y Nginx para que el cambio de grupo surta efecto:
+
+```bash
+sudo systemctl restart php-fpm
+sudo systemctl restart nginx
+```
+
+✅ Nota:
+En entornos de producción se recomienda configurar los permisos con mayor precisión, asegurándose de que solo los directorios de almacenamiento (`storage/`) y caché (`bootstrap/cache/`) tengan permisos de escritura para el servidor web.
+
+## 3. Asignar permisos a `/var/www/html/`
 
 Por defecto, el directorio raíz de los sitios web en Apache en Fedora es:
 
@@ -86,7 +236,7 @@ sudo chown orlandoduranpy /var/www/html
 
 - `/var/www/html`
 
-  Es el directorio donde Apache sirve los archivos web por defecto.
+  Es el directorio donde Apache sirve los archivos web por defecto. Si usas **Nginx**, su directorio raíz predeterminado es `/usr/share/nginx/html`, pero en esta guía se mantiene `/var/www/html` como ubicación de los proyectos (el `root` del Virtual Host de Nginx apunta a la carpeta `public` del proyecto dentro de `/var/www/html`).
 
 Después de ejecutar este comando, el usuario `orlandoduranpy` podrá crear, editar y eliminar archivos en `/var/www/html` sin necesidad de utilizar `sudo` constantemente.
 
@@ -99,11 +249,11 @@ sudo chown -R orlandoduranpy /var/www/html
 
 Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
 
-## 3. Instalación de PHP y Composer
+## 4. Instalación de PHP y Composer
 
 En este paso se instalará PHP junto con un conjunto de extensiones comunes necesarias para trabajar con Laravel y aplicaciones web en general. Posteriormente se verá la instalación de Composer.
 
-### 3.1 Instalación de PHP y extensiones comunes
+### 4.1 Instalación de PHP y extensiones comunes
 
 Para instalar PHP y algunas extensiones recomendadas para Laravel, se puede utilizar el siguiente comando:
 
@@ -165,7 +315,7 @@ php -v
 
 Esto confirma que PHP está disponible en la línea de comandos y listo para utilizarse en el entorno de desarrollo.
 
-### 3.2 Instalación de Composer
+### 4.2 Instalación de Composer
 
 **Composer** es el gestor de dependencias más utilizado en el ecosistema PHP y es una herramienta fundamental para trabajar con `Laravel`, ya que permite instalar el framework y las librerías necesarias para cada proyecto.
 
@@ -191,11 +341,11 @@ composer -V
 
 La salida mostrará la versión instalada de Composer, lo que confirma que la herramienta está lista para ser utilizada en la gestión de dependencias de proyectos PHP y Laravel.
 
-### 3.3 Reiniciar Apache para aplicar los cambios
+### 4.3 Reiniciar el servidor web para aplicar los cambios
 
-Después de instalar PHP y sus extensiones, así como Composer, es recomendable reiniciar el servicio de Apache para asegurarse de que cargue correctamente los módulos de PHP recién instalados.
+Después de instalar PHP y sus extensiones, así como Composer, es recomendable reiniciar el servicio del servidor web para asegurarse de que cargue correctamente los módulos de PHP recién instalados.
 
-Para reiniciar Apache se utiliza el siguiente comando:
+**Si usas Apache**, para reiniciarlo se utiliza el siguiente comando:
 
 ```bash
 sudo systemctl restart httpd.service
@@ -215,11 +365,27 @@ systemctl status httpd.service
 
 Si el servicio aparece como `active (running)` y no se muestran errores, Apache está funcionando correctamente con soporte para PHP y se puede continuar con la configuración del entorno Laravel.
 
-## 4. Instalación de Node.js y npm
+**Si usas Nginx (con PHP-FPM)**, el intérprete de PHP lo gestiona PHP-FPM, por lo que hay que reiniciar ese servicio (y recargar Nginx) para aplicar los cambios:
+
+```bash
+sudo systemctl restart php-fpm
+sudo systemctl restart nginx
+```
+
+Opcionalmente, se puede verificar que ambos servicios sigan en ejecución con:
+
+```bash
+systemctl status php-fpm
+systemctl status nginx
+```
+
+Si ambos aparecen como `active (running)` y no se muestran errores, Nginx está funcionando correctamente con soporte para PHP a través de PHP-FPM.
+
+## 5. Instalación de Node.js y npm
 
 Laravel utiliza **Vite** como herramienta de compilación de assets (CSS, JavaScript) a partir de Laravel 9. Para ejecutar `npm run dev` y `npm run build` dentro de un proyecto Laravel es necesario tener Node.js y npm instalados en el sistema.
 
-### 4.1 Instalar Node.js y npm
+### 5.1 Instalar Node.js y npm
 
 En Fedora, Node.js y npm se pueden instalar directamente desde los repositorios oficiales con el siguiente comando:
 
@@ -229,7 +395,7 @@ sudo dnf install nodejs -y
 
 Este comando instala tanto Node.js como npm en su misma operación, ya que npm viene incluido como dependencia del paquete `nodejs`.
 
-### 4.2 Verificar la instalación
+### 5.2 Verificar la instalación
 
 Una vez finalizada la instalación, se puede confirmar que ambas herramientas están disponibles verificando sus versiones:
 
@@ -247,11 +413,11 @@ v22.22.2
 
 Con Node.js y npm disponibles, es posible instalar las dependencias de frontend de un proyecto Laravel ejecutando `npm install` dentro del directorio del proyecto, y compilar los assets con `npm run dev` (modo desarrollo) o `npm run build` (producción).
 
-## 5. Instalación de MySQL
+## 6. Instalación de MySQL
 
 En este paso se instalará y habilitará el servidor de base de datos MySQL, que será utilizado por las aplicaciones desarrolladas con PHP y Laravel.
 
-### 5.1 Instalar el servidor MySQL
+### 6.1 Instalar el servidor MySQL
 
 Para instalar el servidor MySQL en Fedora, se ejecuta el siguiente comando:
 
@@ -261,7 +427,7 @@ sudo dnf install mysql-server
 
 Este comando descargará e instalará el paquete `mysql-server` junto con sus dependencias.
 
-### 5.2 Iniciar y habilitar el servicio MySQL
+### 6.2 Iniciar y habilitar el servicio MySQL
 
 Una vez instalado, se debe iniciar el servicio de MySQL:
 
@@ -281,7 +447,7 @@ Opcionalmente, se puede comprobar el estado del servicio con:
 systemctl status mysqld
 ```
 
-### 5.3 Configuración inicial con `mysql_secure_installation`
+### 6.3 Configuración inicial con `mysql_secure_installation`
 
 Después de la instalación, es recomendable ejecutar el asistente de configuración de seguridad de MySQL para definir la contraseña del usuario administrador (`root`) y aplicar algunas medidas básicas de seguridad.
 
@@ -371,7 +537,7 @@ All done!
 
 Con esto, la instalación de **MySQL** queda asegurada con una contraseña para `root` y con una configuración básica de seguridad adecuada para continuar con el entorno de desarrollo.
 
-### 5.4 Verificar acceso a MySQL
+### 6.4 Verificar acceso a MySQL
 
 Como último paso, es recomendable validar que el acceso al servidor MySQL funciona correctamente con el usuario `root` y la contraseña configurada en el asistente anterior.
 
@@ -420,7 +586,7 @@ La salida típica incluirá al menos las siguientes bases de datos del sistema:
 
 Si se puede iniciar sesión correctamente y se muestran estas bases de datos sin errores, se puede considerar que la instalación y configuración básica de MySQL se ha realizado con éxito y que el servidor está listo para utilizarse en el entorno de desarrollo.
 
-### 5.5 Crear usuario con acceso completo (recomendado en desarrollo)
+### 6.5 Crear usuario con acceso completo (recomendado en desarrollo)
 
 Por defecto, el único usuario con acceso total en MySQL es `root`. Para el trabajo diario en desarrollo es conveniente crear un usuario propio con privilegios completos sobre todas las bases de datos, evitando así usar `root` directamente.
 
@@ -468,11 +634,11 @@ El valor `Y` en `Super_priv` confirma que el usuario tiene privilegios de superu
 ✅ Nota:
 Otorgar todos los privilegios es adecuado en entornos de desarrollo local. En producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios para cada aplicación.
 
-## 6. Instalación de PostgreSQL
+## 7. Instalación de PostgreSQL
 
 En este paso se instalará y configurará el servidor de base de datos **PostgreSQL**, que puede utilizarse como alternativa a MySQL en proyectos Laravel.
 
-### 6.1 Instalar el servidor PostgreSQL
+### 7.1 Instalar el servidor PostgreSQL
 
 Para instalar PostgreSQL en Fedora, se ejecuta el siguiente comando:
 
@@ -482,7 +648,7 @@ sudo dnf install postgresql-server -y
 
 Este comando descargará e instalará el paquete `postgresql-server` junto con sus dependencias.
 
-### 6.2 Inicializar el clúster de base de datos
+### 7.2 Inicializar el clúster de base de datos
 
 A diferencia de MySQL, PostgreSQL requiere un paso adicional antes de iniciar el servicio: inicializar el directorio de datos. Esto se realiza con:
 
@@ -499,7 +665,7 @@ La salida esperada es similar a:
  * Initialized, logs are in /var/lib/pgsql/initdb_postgresql.log
 ```
 
-### 6.3 Iniciar y habilitar el servicio PostgreSQL
+### 7.3 Iniciar y habilitar el servicio PostgreSQL
 
 Una vez inicializado, se inicia el servicio:
 
@@ -519,7 +685,7 @@ Se puede verificar que el servicio está activo con:
 systemctl status postgresql
 ```
 
-### 6.4 Habilitar conexiones por TCP/IP
+### 7.4 Habilitar conexiones por TCP/IP
 
 Por defecto, PostgreSQL en Fedora solo acepta conexiones a través de un **socket Unix**, no por TCP/IP. Esto es suficiente para acceder con `sudo -u postgres psql`, pero impide que herramientas como **DBeaver**, Laravel o cualquier cliente que se conecte vía `host:puerto` puedan establecer la conexión (se obtiene un error de tipo `Connection refused`).
 
@@ -535,7 +701,7 @@ Y se descomenta (quitando el `#`) la siguiente línea:
 listen_addresses = 'localhost'
 ```
 
-### 6.5 Configurar el método de autenticación
+### 7.5 Configurar el método de autenticación
 
 Por defecto, `pg_hba.conf` utiliza el método de autenticación **`ident`** para las conexiones por host, el cual valida la identidad contra el usuario del sistema operativo en lugar de pedir una contraseña. Esto provoca el error `la autentificación Ident falló para el usuario`.
 
@@ -564,7 +730,7 @@ Se puede confirmar que PostgreSQL ya está escuchando en el puerto TCP con:
 sudo ss -tlnp | grep 5432
 ```
 
-### 6.6 Crear usuario y base de datos
+### 7.6 Crear usuario y base de datos
 
 PostgreSQL utiliza el usuario del sistema `postgres` como administrador. Para acceder al intérprete interactivo de PostgreSQL (`psql`) con ese usuario se ejecuta:
 
@@ -586,7 +752,7 @@ Donde:
 - `CREATE DATABASE ... OWNER` crea la base de datos y asigna el usuario como propietario.
 - `\q` cierra el intérprete `psql`.
 
-### 6.7 Verificar acceso a PostgreSQL
+### 7.7 Verificar acceso a PostgreSQL
 
 Para confirmar que el usuario y la base de datos creados funcionan correctamente, se puede intentar una conexión directa:
 
@@ -605,7 +771,7 @@ Si la conexión es exitosa, `psql` solicitará la contraseña y mostrará una ta
 
 Con esto, la instalación y configuración básica de **PostgreSQL** queda lista para utilizarse en proyectos Laravel.
 
-### 6.8 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
+### 7.8 Otorgar privilegios de superusuario (opcional, recomendado en desarrollo)
 
 Por defecto, el usuario creado en el paso anterior solo tiene acceso a la base de datos de la que es propietario. Para un entorno de desarrollo local es conveniente otorgarle privilegios de **superusuario**, lo que permite crear, eliminar y acceder a cualquier base de datos sin necesidad de usar el usuario `postgres`.
 
@@ -633,152 +799,6 @@ La salida mostrará el listado de roles. El usuario debe aparecer con el atribut
 
 ✅ Nota:
 Otorgar privilegios de superusuario es adecuado en entornos de desarrollo local. En entornos de producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios.
-
-## 7. Instalación de Nginx (alternativa a Apache)
-
-**Nginx** es un servidor web de alto rendimiento que puede utilizarse como alternativa a Apache para servir aplicaciones PHP y Laravel. Se destaca por su bajo consumo de recursos y su eficiencia en el manejo de conexiones concurrentes.
-
-> ⚠️ Si ya tienes Apache (`httpd`) instalado y en ejecución, detén el servicio antes de iniciar Nginx, ya que ambos compiten por el puerto 80:
->
-> ```bash
-> sudo systemctl stop httpd.service
-> sudo systemctl disable httpd.service
-> ```
-
-### 7.1 Instalar Nginx
-
-Para instalar Nginx en Fedora, se ejecuta el siguiente comando:
-
-```bash
-sudo dnf install nginx -y
-```
-
-### 7.2 Iniciar y habilitar el servicio
-
-Una vez instalado, se inicia el servicio y se configura para arrancar automáticamente con el sistema:
-
-```bash
-sudo systemctl start nginx
-sudo systemctl enable nginx
-```
-
-Para verificar que el servicio está activo:
-
-```bash
-systemctl status nginx
-```
-
-Si aparece como `active (running)`, Nginx está funcionando correctamente.
-
-### 7.3 Instalar PHP-FPM
-
-A diferencia de Apache, Nginx no ejecuta PHP de forma nativa. Necesita comunicarse con el proceso **PHP-FPM** (FastCGI Process Manager) para procesar archivos PHP.
-
-Para instalar PHP-FPM:
-
-```bash
-sudo dnf install php-fpm -y
-```
-
-Luego se inicia y habilita el servicio:
-
-```bash
-sudo systemctl start php-fpm
-sudo systemctl enable php-fpm
-```
-
-Se puede comprobar su estado con:
-
-```bash
-systemctl status php-fpm
-```
-
-### 7.4 Configurar un Virtual Host para Laravel
-
-Nginx utiliza archivos de configuración en `/etc/nginx/conf.d/` para definir los sitios que va a servir. A continuación se muestra una configuración básica para un proyecto Laravel.
-
-Crear el archivo de configuración del sitio:
-
-```bash
-sudo nano /etc/nginx/conf.d/laravel.conf
-```
-
-Y añadir el siguiente contenido (ajusta `server_name` y `root` según tu proyecto):
-
-```nginx
-server {
-    listen 80;
-    server_name localhost;
-
-    root /var/www/html/mi-proyecto-laravel/public;
-    index index.php index.html;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        fastcgi_pass   unix:/run/php-fpm/www.sock;
-        fastcgi_index  index.php;
-        fastcgi_param  SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-        include        fastcgi_params;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
-    }
-}
-```
-
-Donde:
-
-- `root` apunta al directorio `public/` del proyecto Laravel, que es el punto de entrada de la aplicación.
-- `try_files` redirige todas las peticiones al `index.php` de Laravel si el archivo o directorio no existe físicamente (necesario para el enrutamiento de Laravel).
-- `fastcgi_pass unix:/run/php-fpm/www.sock` indica a Nginx que delegue la ejecución de PHP al proceso PHP-FPM a través de un socket Unix.
-- El bloque `location ~ /\.` niega el acceso a archivos ocultos como `.env`.
-
-### 7.5 Verificar la configuración y reiniciar Nginx
-
-Antes de reiniciar Nginx, es recomendable verificar que la sintaxis del archivo de configuración sea correcta:
-
-```bash
-sudo nginx -t
-```
-
-La salida esperada, si no hay errores, es:
-
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
-
-Si la verificación es exitosa, se aplican los cambios reiniciando el servicio:
-
-```bash
-sudo systemctl restart nginx
-```
-
-### 7.6 Ajustar permisos para Nginx
-
-El proceso Nginx corre bajo el usuario `nginx`. Para que pueda leer los archivos del proyecto Laravel en `/var/www/html/`, es necesario que el directorio y sus contenidos sean accesibles para ese usuario.
-
-Una forma sencilla en entornos de desarrollo es añadir el usuario `nginx` al grupo del usuario propietario del directorio, o bien ajustar los permisos:
-
-```bash
-sudo usermod -aG orlandoduranpy nginx
-```
-
-Luego reiniciar PHP-FPM y Nginx para que el cambio de grupo surta efecto:
-
-```bash
-sudo systemctl restart php-fpm
-sudo systemctl restart nginx
-```
-
-✅ Nota:
-En entornos de producción se recomienda configurar los permisos con mayor precisión, asegurándose de que solo los directorios de almacenamiento (`storage/`) y caché (`bootstrap/cache/`) tengan permisos de escritura para el servidor web.
 
 ## 8. Instalación de Redis
 
@@ -1008,7 +1028,7 @@ Para crear una nueva conexión a MySQL:
 3. Completar los datos de conexión:
    - **Host:** `127.0.0.1`
    - **Puerto:** `3306`
-   - **Usuario:** el usuario creado en la sección 5.5 (`nombre_usuario`).
+   - **Usuario:** el usuario creado en la sección 6.5 (`nombre_usuario`).
    - **Contraseña:** la contraseña configurada para ese usuario.
 4. Hacer clic en **Probar conexión...** para verificar que los datos son correctos.
 5. Si DBeaver solicita descargar el controlador JDBC de MySQL la primera vez, aceptar la descarga.
@@ -1023,7 +1043,7 @@ Para crear una nueva conexión a PostgreSQL:
 3. Completar los datos de conexión:
    - **Host:** `127.0.0.1`
    - **Puerto:** `5432`
-   - **Base de datos:** la base de datos creada en la sección 6.6 (`nombre_base_de_datos`).
+   - **Base de datos:** la base de datos creada en la sección 7.6 (`nombre_base_de_datos`).
    - **Usuario:** el usuario creado en esa misma sección (`nombre_usuario`).
    - **Contraseña:** la contraseña configurada para ese usuario.
 4. Hacer clic en **Probar conexión...** para verificar que los datos son correctos.
@@ -1031,7 +1051,7 @@ Para crear una nueva conexión a PostgreSQL:
 6. Hacer clic en **Finalizar** para guardar la conexión.
 
 ✅ Nota:
-Si el usuario de PostgreSQL fue elevado a superusuario (sección 6.8), también podrá visualizar y administrar el resto de bases de datos del servidor desde la misma conexión en DBeaver.
+Si el usuario de PostgreSQL fue elevado a superusuario (sección 7.8), también podrá visualizar y administrar el resto de bases de datos del servidor desde la misma conexión en DBeaver.
 
 ✅ Nota:
-Si al conectarte obtienes el error `Connection refused`, revisa que hayas habilitado las conexiones por TCP/IP (sección 6.4). Si obtienes un error de autenticación tipo `la autentificación Ident falló`, revisa el método configurado en `pg_hba.conf` (sección 6.5).
+Si al conectarte obtienes el error `Connection refused`, revisa que hayas habilitado las conexiones por TCP/IP (sección 7.4). Si obtienes un error de autenticación tipo `la autentificación Ident falló`, revisa el método configurado en `pg_hba.conf` (sección 7.5).
