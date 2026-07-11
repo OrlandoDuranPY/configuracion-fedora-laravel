@@ -4,9 +4,9 @@ Este repositorio tiene como objetivo documentar la configuración de un entorno 
 
 A lo largo de esta guía configuraremos los componentes necesarios para trabajar de forma cómoda y ordenada con estas tecnologías, cubriendo, entre otros, los siguientes temas:
 
+- Asignación de permisos a la carpeta `/var/www/html/`.
 - Instalación y configuración de **Apache**.
 - Instalación y configuración de **Nginx** (alternativa a Apache).
-- Asignación de permisos a la carpeta `/var/www/html/`.
 - Instalación de **PHP** y **Composer**.
 - Instalación de **Node.js** y **npm**.
 - Instalación y configuración de **MySQL**.
@@ -18,11 +18,54 @@ A lo largo de esta guía configuraremos los componentes necesarios para trabajar
 
 El objetivo final es contar con un entorno de desarrollo estable, reproducible y fácil de mantener para proyectos basados en PHP/Laravel.
 
-## 1. Instalar Apache (httpd)
+## 1. Asignar permisos a `/var/www/html/`
+
+Por defecto, el directorio raíz de los sitios web en Apache en Fedora es:
+
+`/var/www/html`
+
+Este directorio suele pertenecer al usuario y grupo del sistema (por ejemplo, `root`), lo que obliga a usar `sudo` para crear o editar archivos. Para facilitar el trabajo en un entorno de desarrollo local, es común cambiar el propietario del directorio al usuario que desarrolla en la máquina.
+
+En este ejemplo, el usuario del sistema es `your_username`, por lo que se puede ejecutar el siguiente comando:
+
+```bash
+sudo chown your_username /var/www/html
+```
+
+### ¿Qué hace este comando?
+
+- `sudo`
+
+  Ejecuta el comando con privilegios de administrador (superusuario). Es necesario porque se están modificando permisos de un directorio del sistema.
+
+- `chown`
+
+  Significa change owner (cambiar propietario). Permite cambiar el usuario y/o grupo propietario de un archivo o carpeta.
+
+- `your_username`
+
+  Es el nuevo propietario que se asignará al directorio. En este caso, corresponde al usuario del sistema que desarrollará en Fedora.
+
+- `/var/www/html`
+
+  Es el directorio donde Apache sirve los archivos web por defecto. Si usas **Nginx**, su directorio raíz predeterminado es `/usr/share/nginx/html`, pero en esta guía se mantiene `/var/www/html` como ubicación de los proyectos (el `root` del Virtual Host de Nginx apunta a la carpeta `public` del proyecto dentro de `/var/www/html`).
+
+Después de ejecutar este comando, el usuario `your_username` podrá crear, editar y eliminar archivos en `/var/www/html` sin necesidad de utilizar `sudo` constantemente.
+
+✅ Nota:
+Si se desea que el cambio aplique también a todos los archivos y subdirectorios dentro de `/var/www/html`, se puede usar la opción `-R` (recursivo):
+
+```bash
+sudo chown -R your_username /var/www/html
+```
+
+Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
+
+## 2. Instalar Apache (httpd)
 
 En este primer paso instalaremos y habilitaremos el servidor web **Apache (httpd)**, que utilizaremos como base para ejecutar nuestras aplicaciones PHP/Laravel.
 
-### 1.1 Instalar el paquete httpd
+### 2.1 Instalar el paquete httpd
 
 Ejecuta el siguiente comando para instalar Apache:
 
@@ -32,7 +75,7 @@ sudo dnf install httpd -y
 
 El parámetro `-y` acepta automáticamente las confirmaciones de instalación.
 
-### 1.2 Iniciar el servicio de Apache
+### 2.2 Iniciar el servicio de Apache
 
 Una vez instalado, inicia el servicio:
 
@@ -46,7 +89,7 @@ Opcionalmente, puedes verificar que el servicio esté en ejecución con:
 systemctl status httpd.service
 ```
 
-### 1.3 Habilitar Apache al inicio del sistema
+### 2.3 Habilitar Apache al inicio del sistema
 
 Para que Apache se inicie automáticamente cada vez que arranque el sistema, ejecuta:
 
@@ -56,11 +99,11 @@ sudo systemctl enable httpd.service
 
 Con esto, el servicio httpd quedará instalado, iniciado y configurado para arrancar automáticamente con Fedora Workstation.
 
-## 2. Instalación de Nginx (alternativa a Apache)
+## 3. Instalación de Nginx (alternativa a Apache)
 
 **Nginx** es un servidor web de alto rendimiento que puede utilizarse como alternativa a Apache para servir aplicaciones PHP y Laravel. Se destaca por su bajo consumo de recursos y su eficiencia en el manejo de conexiones concurrentes.
 
-Se usa **uno u otro**, no ambos a la vez: por defecto Apache y Nginx compiten por el puerto 80. Si prefieres Nginx, sigue esta sección; si te quedas con Apache (sección 1), puedes omitirla.
+Se usa **uno u otro**, no ambos a la vez: por defecto Apache y Nginx compiten por el puerto 80. Si prefieres Nginx, sigue esta sección; si te quedas con Apache (sección 2), puedes omitirla.
 
 > ⚠️ Si ya tienes Apache (`httpd`) instalado y en ejecución, detén el servicio antes de iniciar Nginx, ya que ambos compiten por el puerto 80:
 >
@@ -69,7 +112,7 @@ Se usa **uno u otro**, no ambos a la vez: por defecto Apache y Nginx compiten po
 > sudo systemctl disable httpd.service
 > ```
 
-### 2.1 Instalar Nginx
+### 3.1 Instalar Nginx
 
 Para instalar Nginx en Fedora, se ejecuta el siguiente comando:
 
@@ -77,7 +120,7 @@ Para instalar Nginx en Fedora, se ejecuta el siguiente comando:
 sudo dnf install nginx -y
 ```
 
-### 2.2 Iniciar y habilitar el servicio
+### 3.2 Iniciar y habilitar el servicio
 
 Una vez instalado, se inicia el servicio y se configura para arrancar automáticamente con el sistema:
 
@@ -94,7 +137,7 @@ systemctl status nginx
 
 Si aparece como `active (running)`, Nginx está funcionando correctamente.
 
-### 2.3 Instalar PHP-FPM
+### 3.3 Instalar PHP-FPM
 
 A diferencia de Apache, Nginx no ejecuta PHP de forma nativa. Necesita comunicarse con el proceso **PHP-FPM** (FastCGI Process Manager) para procesar archivos PHP.
 
@@ -119,7 +162,7 @@ Se puede comprobar su estado con:
 systemctl status php-fpm
 ```
 
-### 2.4 Configurar un Virtual Host para Laravel
+### 3.4 Configurar un Virtual Host para Laravel
 
 Nginx utiliza archivos de configuración en `/etc/nginx/conf.d/` para definir los sitios que va a servir. A continuación se muestra una configuración básica para un proyecto Laravel.
 
@@ -165,7 +208,7 @@ Donde:
 - `fastcgi_pass unix:/run/php-fpm/www.sock` indica a Nginx que delegue la ejecución de PHP al proceso PHP-FPM a través de un socket Unix.
 - El bloque `location ~ /\.` niega el acceso a archivos ocultos como `.env`.
 
-### 2.5 Verificar la configuración y reiniciar Nginx
+### 3.5 Verificar la configuración y reiniciar Nginx
 
 Antes de reiniciar Nginx, es recomendable verificar que la sintaxis del archivo de configuración sea correcta:
 
@@ -186,7 +229,7 @@ Si la verificación es exitosa, se aplican los cambios reiniciando el servicio:
 sudo systemctl restart nginx
 ```
 
-### 2.6 Ajustar permisos para Nginx
+### 3.6 Ajustar permisos para Nginx
 
 El proceso Nginx corre bajo el usuario `nginx`. Para que pueda leer los archivos del proyecto Laravel en `/var/www/html/`, es necesario que el directorio y sus contenidos sean accesibles para ese usuario.
 
@@ -205,49 +248,6 @@ sudo systemctl restart nginx
 
 ✅ Nota:
 En entornos de producción se recomienda configurar los permisos con mayor precisión, asegurándose de que solo los directorios de almacenamiento (`storage/`) y caché (`bootstrap/cache/`) tengan permisos de escritura para el servidor web.
-
-## 3. Asignar permisos a `/var/www/html/`
-
-Por defecto, el directorio raíz de los sitios web en Apache en Fedora es:
-
-`/var/www/html`
-
-Este directorio suele pertenecer al usuario y grupo del sistema (por ejemplo, `root`), lo que obliga a usar `sudo` para crear o editar archivos. Para facilitar el trabajo en un entorno de desarrollo local, es común cambiar el propietario del directorio al usuario que desarrolla en la máquina.
-
-En este ejemplo, el usuario del sistema es `your_username`, por lo que se puede ejecutar el siguiente comando:
-
-```bash
-sudo chown your_username /var/www/html
-```
-
-### ¿Qué hace este comando?
-
-- `sudo`
-
-  Ejecuta el comando con privilegios de administrador (superusuario). Es necesario porque se están modificando permisos de un directorio del sistema.
-
-- `chown`
-
-  Significa change owner (cambiar propietario). Permite cambiar el usuario y/o grupo propietario de un archivo o carpeta.
-
-- `your_username`
-
-  Es el nuevo propietario que se asignará al directorio. En este caso, corresponde al usuario del sistema que desarrollará en Fedora.
-
-- `/var/www/html`
-
-  Es el directorio donde Apache sirve los archivos web por defecto. Si usas **Nginx**, su directorio raíz predeterminado es `/usr/share/nginx/html`, pero en esta guía se mantiene `/var/www/html` como ubicación de los proyectos (el `root` del Virtual Host de Nginx apunta a la carpeta `public` del proyecto dentro de `/var/www/html`).
-
-Después de ejecutar este comando, el usuario `your_username` podrá crear, editar y eliminar archivos en `/var/www/html` sin necesidad de utilizar `sudo` constantemente.
-
-✅ Nota:
-Si se desea que el cambio aplique también a todos los archivos y subdirectorios dentro de `/var/www/html`, se puede usar la opción `-R` (recursivo):
-
-```bash
-sudo chown -R your_username /var/www/html
-```
-
-Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
 
 ## 4. Instalación de PHP y Composer
 
