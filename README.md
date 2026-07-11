@@ -64,10 +64,10 @@ Por defecto, el directorio raíz de los sitios web en Apache en Fedora es:
 
 Este directorio suele pertenecer al usuario y grupo del sistema (por ejemplo, `root`), lo que obliga a usar `sudo` para crear o editar archivos. Para facilitar el trabajo en un entorno de desarrollo local, es común cambiar el propietario del directorio al usuario que desarrolla en la máquina.
 
-En este ejemplo, el usuario del sistema es `orlandoduranpy`, por lo que se puede ejecutar el siguiente comando:
+En este ejemplo, el usuario del sistema es `your_username`, por lo que se puede ejecutar el siguiente comando:
 
 ```bash
-sudo chown orlandoduranpy /var/www/html
+sudo chown your_username /var/www/html
 ```
 
 ### ¿Qué hace este comando?
@@ -80,7 +80,7 @@ sudo chown orlandoduranpy /var/www/html
 
   Significa change owner (cambiar propietario). Permite cambiar el usuario y/o grupo propietario de un archivo o carpeta.
 
-- `orlandoduranpy`
+- `your_username`
 
   Es el nuevo propietario que se asignará al directorio. En este caso, corresponde al usuario del sistema que desarrollará en Fedora.
 
@@ -88,13 +88,13 @@ sudo chown orlandoduranpy /var/www/html
 
   Es el directorio donde Apache sirve los archivos web por defecto.
 
-Después de ejecutar este comando, el usuario `orlandoduranpy` podrá crear, editar y eliminar archivos en `/var/www/html` sin necesidad de utilizar `sudo` constantemente.
+Después de ejecutar este comando, el usuario `your_username` podrá crear, editar y eliminar archivos en `/var/www/html` sin necesidad de utilizar `sudo` constantemente.
 
 ✅ Nota:
 Si se desea que el cambio aplique también a todos los archivos y subdirectorios dentro de `/var/www/html`, se puede usar la opción `-R` (recursivo):
 
 ```bash
-sudo chown -R orlandoduranpy /var/www/html
+sudo chown -R your_username /var/www/html
 ```
 
 Esta opción debe utilizarse con cuidado, ya que modificará el propietario de todos los elementos contenidos en ese directorio.
@@ -767,7 +767,7 @@ El proceso Nginx corre bajo el usuario `nginx`. Para que pueda leer los archivos
 Una forma sencilla en entornos de desarrollo es añadir el usuario `nginx` al grupo del usuario propietario del directorio, o bien ajustar los permisos:
 
 ```bash
-sudo usermod -aG orlandoduranpy nginx
+sudo usermod -aG your_username nginx
 ```
 
 Luego reiniciar PHP-FPM y Nginx para que el cambio de grupo surta efecto:
@@ -913,7 +913,7 @@ After=network.target
 [Service]
 ExecStart=/usr/local/bin/mailpit --listen 127.0.0.1:8025 --smtp 127.0.0.1:1025
 Restart=on-failure
-User=orlandoduranpy
+User=your_username
 
 [Install]
 WantedBy=multi-user.target
@@ -923,7 +923,7 @@ Donde:
 
 - `--listen 127.0.0.1:8025` define el puerto de la interfaz web donde se visualizan los correos capturados.
 - `--smtp 127.0.0.1:1025` define el puerto SMTP que utilizará Laravel para enviar los correos.
-- `User=orlandoduranpy` ejecuta el proceso bajo el usuario del sistema en lugar de `root`.
+- `User=your_username` ejecuta el proceso bajo el usuario del sistema en lugar de `root`.
 
 ### 9.3 Iniciar y habilitar el servicio
 
