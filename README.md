@@ -11,6 +11,7 @@ A lo largo de esta guía configuraremos los componentes necesarios para trabajar
 - Instalación de **Node.js** y **npm**.
 - Instalación y configuración de **MySQL**.
 - Instalación y configuración de **PostgreSQL**.
+- Instalación y configuración de **MariaDB**.
 - Instalación y configuración de **Redis**.
 - Instalación y configuración de **Mailpit**.
 - Instalación de **DBeaver** como administrador gráfico de bases de datos.
@@ -800,11 +801,270 @@ La salida mostrará el listado de roles. El usuario debe aparecer con el atribut
 ✅ Nota:
 Otorgar privilegios de superusuario es adecuado en entornos de desarrollo local. En entornos de producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios.
 
-## 8. Instalación de Redis
+## 8. Instalación de MariaDB
+
+En este paso se instalará y configurará el servidor de base de datos **MariaDB**, un fork de MySQL compatible a nivel de protocolo y de sintaxis SQL, que puede utilizarse como alternativa a MySQL en proyectos Laravel.
+
+⚠️ Importante:
+MariaDB y MySQL usan el mismo puerto (`3306`) y sus paquetes entran en conflicto. **No deben instalarse ni ejecutarse ambos servidores a la vez** en la misma máquina. Si ya se instaló MySQL (sección 6), detén y deshabilita su servicio antes de continuar:
+
+```bash
+sudo systemctl disable --now mysqld
+```
+
+En Laravel se conecta con el mismo driver que MySQL (`DB_CONNECTION=mariadb` o `mysql`), y la extensión `php-mysqlnd` instalada en la sección 4.1 ya es suficiente; no hace falta instalar extensiones adicionales de PHP.
+
+### 8.1 Instalar el servidor MariaDB
+
+Para instalar MariaDB en Fedora, se ejecuta el siguiente comando:
+
+```bash
+sudo dnf install mariadb-server -y
+```
+
+Este comando descargará e instalará el paquete `mariadb-server` junto con sus dependencias, incluido el cliente de línea de comandos `mariadb`.
+
+### 8.2 Iniciar y habilitar el servicio MariaDB
+
+Una vez instalado, se inicia el servicio:
+
+```bash
+sudo systemctl start mariadb
+```
+
+Para que arranque automáticamente con el sistema:
+
+```bash
+sudo systemctl enable mariadb
+```
+
+Opcionalmente, se puede comprobar el estado del servicio con:
+
+```bash
+systemctl status mariadb
+```
+
+La salida debe mostrar `active (running)`.
+
+### 8.3 Configuración inicial con `mariadb-secure-installation`
+
+Al igual que MySQL, MariaDB incluye un asistente para asegurar la instalación: define la contraseña de `root`, elimina usuarios anónimos y la base de datos de pruebas.
+
+```bash
+sudo mariadb-secure-installation
+```
+
+El asistente comenzará mostrando algo similar a:
+
+```bash
+Enter current password for root (enter for none):
+```
+
+Como todavía no existe contraseña de `root`, se pulsa **Enter** para continuar.
+
+A continuación se preguntará si se desea cambiar a autenticación por `unix_socket`:
+
+```bash
+Switch to unix_socket authentication [Y/n]
+```
+
+Si se responde `n`, `root` seguirá autenticándose por contraseña, lo que facilita conectarse desde clientes como DBeaver.
+
+Después se ofrece establecer la contraseña de `root`:
+
+```bash
+Change the root password? [Y/n]
+New password:
+Re-enter new password:
+```
+
+El resto de preguntas son equivalentes a las de MySQL:
+
+- **Eliminar usuarios anónimos:**
+
+```bash
+Remove anonymous users? [Y/n]
+```
+
+- **Restringir el acceso remoto de `root`:**
+
+```bash
+Disallow root login remotely? [Y/n]
+```
+
+- **Eliminar la base de datos de pruebas (`test`):**
+
+```bash
+Remove test database and access to it? [Y/n]
+```
+
+- **Recargar las tablas de privilegios:**
+
+```bash
+Reload privilege tables now? [Y/n]
+```
+
+Al finalizar, el asistente mostrará:
+
+```bash
+Thanks for using MariaDB!
+```
+
+### 8.4 Verificar acceso a MariaDB
+
+Para comprobar que el acceso funciona con el usuario `root` y la contraseña configurada:
+
+```bash
+sudo mariadb -u root -p
+```
+
+Donde:
+
+- `sudo` ejecuta el comando con privilegios de superusuario.
+
+- `-u root` indica que se usará el usuario root de MariaDB.
+
+- `-p` indica que se solicitará la contraseña al iniciar sesión.
+
+Tras introducir la contraseña correcta, se mostrará el monitor de MariaDB:
+
+```
+Welcome to the MariaDB monitor.  Commands end with ; or \g.
+MariaDB [(none)]>
+```
+
+Dentro del monitor se pueden listar las bases de datos con:
+
+```bash
+SHOW DATABASES;
+```
+
+La salida típica incluirá al menos las siguientes bases de datos del sistema:
+
+- `information_schema`
+
+- `mysql`
+
+- `performance_schema`
+
+- `sys`
+
+Si el inicio de sesión funciona y se muestran estas bases de datos sin errores, la instalación básica de MariaDB está lista para usarse en el entorno de desarrollo.
+
+### 8.5 Crear usuario con acceso completo (recomendado en desarrollo)
+
+Igual que en MySQL, conviene crear un usuario propio con privilegios completos en lugar de trabajar con `root`.
+
+Para acceder como `root` y crear el nuevo usuario:
+
+```bash
+sudo mariadb -u root -p
+```
+
+Dentro del monitor se ejecutan los siguientes comandos:
+
+```sql
+CREATE USER 'nombre_usuario'@'localhost' IDENTIFIED BY 'contraseña_segura';
+GRANT ALL PRIVILEGES ON *.* TO 'nombre_usuario'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+\q
+```
+
+Donde:
+
+- `CREATE USER` crea el nuevo usuario con su contraseña.
+- `GRANT ALL PRIVILEGES ON *.*` otorga permisos sobre todas las bases de datos (`*`) y todas las tablas (`*`).
+- `WITH GRANT OPTION` permite que el usuario pueda a su vez otorgar privilegios a otros usuarios.
+- `FLUSH PRIVILEGES` aplica los cambios inmediatamente en el servidor.
+- `\q` cierra el monitor de MariaDB.
+
+Para verificar que el usuario fue creado correctamente con privilegios de superusuario:
+
+```bash
+sudo mariadb -u root -p -e "SELECT user, host, Super_priv FROM mysql.user WHERE user='nombre_usuario';"
+```
+
+La salida esperada es:
+
+```
++----------------+-----------+------------+
+| user           | host      | Super_priv |
++----------------+-----------+------------+
+| nombre_usuario | localhost | Y          |
++----------------+-----------+------------+
+```
+
+El valor `Y` en `Super_priv` confirma que el usuario tiene privilegios de superusuario sobre el servidor MariaDB.
+
+### 8.6 Crear la base de datos del proyecto
+
+Para crear una base de datos con la codificación recomendada para Laravel:
+
+```sql
+CREATE DATABASE nombre_base_de_datos CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 8.7 Configurar Laravel para utilizar MariaDB
+
+En el archivo `.env` del proyecto Laravel se define la conexión:
+
+```dotenv
+DB_CONNECTION=mariadb
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=nombre_base_de_datos
+DB_USERNAME=nombre_usuario
+DB_PASSWORD=contraseña_segura
+```
+
+✅ Nota:
+El driver `mariadb` existe a partir de Laravel 11. En versiones anteriores se debe usar `DB_CONNECTION=mysql`, que también funciona correctamente contra un servidor MariaDB.
+
+Para comprobar la conexión desde el proyecto:
+
+```bash
+php artisan migrate
+```
+
+✅ Nota:
+Otorgar todos los privilegios es adecuado en entornos de desarrollo local. En producción se recomienda aplicar el principio de mínimo privilegio y conceder únicamente los permisos estrictamente necesarios para cada aplicación.
+
+### 8.8 Solución de problemas: reinstalación limpia
+
+Si el servicio falla al iniciar (`sudo systemctl start mariadb`) y en el log aparece un error como:
+
+```bash
+sudo tail -40 /var/log/mariadb/mariadb.log
+```
+
+```
+[ERROR] InnoDB: File ./ib_logfile0 was not found
+[ERROR] Unknown/unsupported storage engine: InnoDB
+[ERROR] Aborting
+```
+
+significa que el directorio de datos (`/var/lib/mysql`) está corrupto o incompleto (por ejemplo, tras un apagado abrupto). La solución es reinstalar MariaDB desde cero, eliminando el directorio de datos:
+
+```bash
+sudo systemctl stop mariadb
+sudo dnf remove mariadb-server mariadb -y
+sudo rm -rf /var/lib/mysql
+sudo dnf install mariadb-server -y
+sudo systemctl start mariadb
+sudo systemctl enable mariadb
+systemctl status mariadb
+```
+
+⚠️ Importante:
+`rm -rf /var/lib/mysql` borra **todos** los datos existentes. Solo debe ejecutarse si el servidor no arranca y no hay forma de recuperar los datos, o si no importa perderlos (entorno de desarrollo local).
+
+Tras la reinstalación, se debe repetir el proceso completo desde la sección [8.3](#83-configuración-inicial-con-mariadb-secure-installation): asegurar la instalación con `mariadb-secure-installation` y crear nuevamente el usuario propio.
+
+## 9. Instalación de Redis
 
 **Redis** es una base de datos en memoria que Laravel puede utilizar como backend para **caché**, **sesiones** y **colas** (`queues`), ofreciendo un rendimiento muy superior al de los drivers basados en archivos o en base de datos.
 
-### 8.1 Instalar el servidor Redis
+### 9.1 Instalar el servidor Redis
 
 Para instalar Redis en Fedora, se ejecuta el siguiente comando:
 
@@ -812,7 +1072,7 @@ Para instalar Redis en Fedora, se ejecuta el siguiente comando:
 sudo dnf install redis -y
 ```
 
-### 8.2 Iniciar y habilitar el servicio
+### 9.2 Iniciar y habilitar el servicio
 
 Una vez instalado, se inicia el servicio y se habilita para que arranque junto con el sistema:
 
@@ -827,7 +1087,7 @@ Se puede comprobar que el servicio está activo con:
 systemctl status redis
 ```
 
-### 8.3 Verificar el funcionamiento de Redis
+### 9.3 Verificar el funcionamiento de Redis
 
 Redis incluye un cliente de línea de comandos (`redis-cli`) que permite probar la conexión al servidor:
 
@@ -841,7 +1101,7 @@ Si el servidor responde correctamente, la salida será:
 PONG
 ```
 
-### 8.4 Instalar la extensión de PHP para Redis
+### 9.4 Instalar la extensión de PHP para Redis
 
 Para que Laravel pueda comunicarse con Redis a través de PHP, es necesario instalar la extensión `php-redis`:
 
@@ -875,7 +1135,7 @@ php -m | grep redis
 
 Si la salida muestra `redis`, la extensión está correctamente instalada y disponible para Laravel.
 
-### 8.5 Configurar Laravel para utilizar Redis
+### 9.5 Configurar Laravel para utilizar Redis
 
 En el archivo `.env` del proyecto Laravel, se deben ajustar las variables de conexión a Redis:
 
@@ -898,11 +1158,11 @@ Donde:
 ✅ Nota:
 Por defecto, Redis en Fedora solo acepta conexiones locales (`127.0.0.1`), lo cual es adecuado para un entorno de desarrollo. En producción se recomienda configurar una contraseña (`requirepass` en `/etc/redis/redis.conf`) y restringir el acceso únicamente a los hosts necesarios.
 
-## 9. Instalación de Mailpit
+## 10. Instalación de Mailpit
 
 **Mailpit** es un servidor SMTP de pruebas que captura todos los correos enviados por la aplicación durante el desarrollo, sin entregarlos realmente a destinatarios externos. Permite visualizar los correos enviados por Laravel (registro de usuarios, recuperación de contraseña, notificaciones, etc.) a través de una interfaz web.
 
-### 9.1 Descargar el binario de Mailpit
+### 10.1 Descargar el binario de Mailpit
 
 Mailpit no está disponible en los repositorios oficiales de Fedora, por lo que se instala mediante su script oficial de instalación:
 
@@ -915,7 +1175,7 @@ Este comando descarga el binario de Mailpit correspondiente a la arquitectura de
 ✅ Nota:
 Es recomendable revisar el script en el repositorio oficial de [Mailpit](https://github.com/axllent/mailpit) antes de ejecutarlo, como buena práctica de seguridad al instalar software mediante scripts de terceros.
 
-### 9.2 Crear un servicio systemd para Mailpit
+### 10.2 Crear un servicio systemd para Mailpit
 
 Para que Mailpit se ejecute como un servicio en segundo plano y se inicie automáticamente con el sistema, se crea un archivo de unidad de systemd:
 
@@ -945,7 +1205,7 @@ Donde:
 - `--smtp 127.0.0.1:1025` define el puerto SMTP que utilizará Laravel para enviar los correos.
 - `User=your_username` ejecuta el proceso bajo el usuario del sistema en lugar de `root`.
 
-### 9.3 Iniciar y habilitar el servicio
+### 10.3 Iniciar y habilitar el servicio
 
 Después de crear el archivo de servicio, se recarga la configuración de systemd y se inicia Mailpit:
 
@@ -961,7 +1221,7 @@ Se puede verificar el estado del servicio con:
 systemctl status mailpit
 ```
 
-### 9.4 Acceder a la interfaz web de Mailpit
+### 10.4 Acceder a la interfaz web de Mailpit
 
 Una vez iniciado el servicio, la interfaz web de Mailpit estará disponible en:
 
@@ -971,7 +1231,7 @@ http://127.0.0.1:8025
 
 Desde esta interfaz se pueden visualizar todos los correos capturados, junto con su contenido en HTML y texto plano.
 
-### 9.5 Configurar Laravel para utilizar Mailpit
+### 10.5 Configurar Laravel para utilizar Mailpit
 
 En el archivo `.env` del proyecto Laravel, se deben ajustar las variables de configuración de correo:
 
@@ -991,11 +1251,11 @@ Con esta configuración, cualquier correo enviado desde Laravel (mediante `Mail:
 ✅ Nota:
 Mailpit es ideal únicamente para entornos de desarrollo. En producción se debe configurar un proveedor de correo real (SMTP, Mailgun, SES, etc.).
 
-## 10. Instalación de DBeaver
+## 11. Instalación de DBeaver
 
 **DBeaver** es un administrador gráfico de bases de datos de código libre, compatible con MySQL, PostgreSQL y muchos otros motores. Permite explorar bases de datos, ejecutar consultas SQL, editar datos y administrar conexiones desde una interfaz de escritorio, como alternativa a herramientas como phpMyAdmin.
 
-### 10.1 Instalar DBeaver mediante Flatpak
+### 11.1 Instalar DBeaver mediante Flatpak
 
 En Fedora, la forma más sencilla de instalar DBeaver es a través de **Flatpak**, ya que no está disponible en los repositorios oficiales de `dnf`.
 
@@ -1011,7 +1271,7 @@ Luego se instala DBeaver Community Edition:
 flatpak install flathub io.dbeaver.DBeaverCommunity -y
 ```
 
-### 10.2 Iniciar DBeaver
+### 11.2 Iniciar DBeaver
 
 Una vez instalado, se puede iniciar desde el menú de aplicaciones de Fedora, o ejecutando:
 
@@ -1019,7 +1279,7 @@ Una vez instalado, se puede iniciar desde el menú de aplicaciones de Fedora, o 
 flatpak run io.dbeaver.DBeaverCommunity
 ```
 
-### 10.3 Conectarse a MySQL desde DBeaver
+### 11.3 Conectarse a MySQL desde DBeaver
 
 Para crear una nueva conexión a MySQL:
 
@@ -1034,7 +1294,26 @@ Para crear una nueva conexión a MySQL:
 5. Si DBeaver solicita descargar el controlador JDBC de MySQL la primera vez, aceptar la descarga.
 6. Hacer clic en **Finalizar** para guardar la conexión.
 
-### 10.4 Conectarse a PostgreSQL desde DBeaver
+### 11.4 Conectarse a MariaDB desde DBeaver
+
+Para crear una nueva conexión a MariaDB:
+
+1. Abrir DBeaver y hacer clic en **Nueva conexión a base de datos**.
+2. Seleccionar **MariaDB** en la lista de controladores.
+3. Completar los datos de conexión:
+   - **Host:** `127.0.0.1`
+   - **Puerto:** `3306`
+   - **Base de datos:** la base de datos creada en la sección 8.6 (`nombre_base_de_datos`).
+   - **Usuario:** el usuario creado en la sección 8.5 (`nombre_usuario`).
+   - **Contraseña:** la contraseña configurada para ese usuario.
+4. Hacer clic en **Probar conexión...** para verificar que los datos son correctos.
+5. Si DBeaver solicita descargar el controlador JDBC de MariaDB la primera vez, aceptar la descarga.
+6. Hacer clic en **Finalizar** para guardar la conexión.
+
+✅ Nota:
+Si `mariadb-secure-installation` se configuró con autenticación `unix_socket` para `root`, ese usuario no podrá conectarse desde DBeaver por TCP/IP; usa el usuario creado en la sección 8.5.
+
+### 11.5 Conectarse a PostgreSQL desde DBeaver
 
 Para crear una nueva conexión a PostgreSQL:
 
