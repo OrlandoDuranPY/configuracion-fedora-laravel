@@ -2,20 +2,21 @@
 
 Este repositorio tiene como objetivo documentar la configuración de un entorno de desarrollo en **Fedora Workstation** orientado a **PHP** y **Laravel**.
 
-A lo largo de esta guía configuraremos los componentes necesarios para trabajar de forma cómoda y ordenada con estas tecnologías, cubriendo, entre otros, los siguientes temas:
+A lo largo de esta guía configuraremos los componentes necesarios para trabajar de forma cómoda y ordenada con estas tecnologías.
 
-- Asignación de permisos a la carpeta `/var/www/html/`.
-- Instalación y configuración de **Apache**.
-- Instalación y configuración de **Nginx** (alternativa a Apache).
-- Instalación de **PHP** y **Composer**.
-- Instalación de **Node.js** y **npm**.
-- Instalación y configuración de **MySQL**.
-- Instalación y configuración de **PostgreSQL**.
-- Instalación y configuración de **MariaDB**.
-- Instalación y configuración de **Redis**.
-- Instalación y configuración de **Mailpit**.
-- Instalación de **DBeaver** como administrador gráfico de bases de datos.
-- Ajustes adicionales útiles para el desarrollo con Laravel.
+## Índice
+
+1. [Asignar permisos a `/var/www/html/`](#1-asignar-permisos-a-varwwwhtml)
+2. [Instalar Apache (httpd)](#2-instalar-apache-httpd)
+3. [Instalación de Nginx (alternativa a Apache)](#3-instalación-de-nginx-alternativa-a-apache)
+4. [Instalación de PHP y Composer](#4-instalación-de-php-y-composer)
+5. [Instalación de Node.js y npm](#5-instalación-de-nodejs-y-npm)
+6. [Instalación de MySQL](#6-instalación-de-mysql)
+7. [Instalación de PostgreSQL](#7-instalación-de-postgresql)
+8. [Instalación de MariaDB](#8-instalación-de-mariadb)
+9. [Instalación de Redis](#9-instalación-de-redis)
+10. [Instalación de Mailpit](#10-instalación-de-mailpit)
+11. [Instalación de DBeaver](#11-instalación-de-dbeaver)
 
 El objetivo final es contar con un entorno de desarrollo estable, reproducible y fácil de mantener para proyectos basados en PHP/Laravel.
 
